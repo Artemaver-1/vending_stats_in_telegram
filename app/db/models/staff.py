@@ -48,8 +48,6 @@ class Task(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     due_on: Mapped[date] = mapped_column(index=True)
     machine_id: Mapped[int | None] = mapped_column(ForeignKey("machines.id", ondelete="SET NULL"))
-    # NULL means any member of the service team can pick it up.
-    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     attachment_id: Mapped[int | None] = mapped_column(
         ForeignKey("attachments.id", ondelete="SET NULL")
@@ -63,7 +61,6 @@ class Task(TimestampMixin, Base):
     seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     machine: Mapped[Machine | None] = relationship()
-    assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
     completed_by: Mapped[User | None] = relationship(foreign_keys=[completed_by_id])
     attachment: Mapped[Attachment | None] = relationship()
     checks: Mapped[list["InspectionCheck"]] = relationship(

@@ -121,7 +121,7 @@ async def change_access(
         background.add_task(
             notifier.send,
             [user.telegram_id],
-            "✅ Доступ открыт! Нажмите кнопку «Открыть» внизу чата.",
+            "✅ Доступ открыт! Отправьте /start, чтобы открыть приложение.",
         )
         toast = f"{user.name} теперь в команде"
     else:

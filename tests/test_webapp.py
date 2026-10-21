@@ -255,3 +255,36 @@ async def test_income_statement_shows_taxes_and_shares(client: httpx.AsyncClient
     ):
         assert line in text
     assert "−1 150 ₽" in text  # nothing earned, everything spent
+
+
+async def test_service_accounts_share_one_screen(
+    app: FastAPI, client: httpx.AsyncClient, db: Database
+) -> None:
+    second_tg = 4004
+    async with db.session() as session:
+        session.add(
+            User(telegram_id=second_tg, name="Второй", role=UserRole.WORKER, is_active=True)
+        )
+
+    created = await client.post(
+        "/app/admin/tasks",
+        data={"title": "Подшить грушу", "due_on": "2026-10-22"},
+        headers=as_user(ADMIN_TG),
+    )
+    assert created.status_code == 200
+    ((recipients, _, _),) = notifier(app).sent
+    assert sorted(recipients) == sorted([WORKER_TG, second_tg])
+
+    first = await client.get("/app/service", headers=as_user(WORKER_TG))
+    second = await client.get("/app/service", headers=as_user(second_tg))
+    assert "Подшить грушу" in first.text and "Подшить грушу" in second.text
+
+    async with db.session() as session:
+        task = await session.scalar(select(Task).where(Task.title == "Подшить грушу"))
+        assert task is not None
+        task_id = task.id
+    await client.post(f"/app/service/tasks/{task_id}/done", headers=as_user(second_tg))
+
+    # Whoever closed it, the other account sees the same result.
+    after = await client.get("/app/service", headers=as_user(WORKER_TG))
+    assert "Недавно сделано" in after.text and "Второй" in after.text

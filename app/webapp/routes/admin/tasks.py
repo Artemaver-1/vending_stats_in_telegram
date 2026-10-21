@@ -49,9 +49,7 @@ async def tasks_page(
 
 
 @router.get("/tasks/new", response_class=HTMLResponse)
-async def new_task_form(
-    request: Request, _: AdminUser, session: SessionDep, users: UsersDep
-) -> HTMLResponse:
+async def new_task_form(request: Request, _: AdminUser, session: SessionDep) -> HTMLResponse:
     return await admin_page(
         request,
         session,
@@ -59,7 +57,6 @@ async def new_task_form(
         tab="tasks",
         back="/app/admin/tasks",
         machines=await MachineRepository(session).list_active(),
-        workers=await users.active(UserRole.WORKER),
     )
 
 
@@ -76,7 +73,6 @@ async def create_task(
     due_on: Annotated[date, Form()],
     description: Annotated[str, Form()] = "",
     machine_id: Annotated[str, Form()] = "",
-    assignee_id: Annotated[str, Form()] = "",
     attachment: Annotated[UploadFile | None, File()] = None,
 ) -> HTMLResponse:
     new_attachment = None
@@ -93,16 +89,12 @@ async def create_task(
         description=description,
         due_on=due_on,
         machine_id=optional_int(machine_id),
-        assignee_id=optional_int(assignee_id),
         author=admin,
         attachment=new_attachment,
     )
     await session.commit()
 
-    if task.assignee is not None:
-        recipients = [task.assignee.telegram_id]
-    else:
-        recipients = await users.telegram_ids(UserRole.WORKER)
+    recipients = await users.telegram_ids(UserRole.WORKER)
     photo = None
     if new_attachment and new_attachment.content_type.startswith("image/"):
         photo = Photo(new_attachment.filename, new_attachment.data)

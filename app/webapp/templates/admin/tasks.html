@@ -12,7 +12,7 @@
 
 <div class="list">
   {% for task in tasks %}
-    {{ task_item(task, "/app/admin/tasks/%d" % task.id, show_assignee=true) }}
+    {{ task_item(task, "/app/admin/tasks/%d" % task.id) }}
   {% else %}
     <div class="empty">{{ "Активных задач нет" if view == "open" else "Пока ничего не выполнено" }}</div>
   {% endfor %}

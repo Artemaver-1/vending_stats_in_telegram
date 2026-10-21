@@ -17,7 +17,7 @@
   {{ "🔍" if task.kind.value == "inspection" else "📌" }}
 {%- endmacro %}
 
-{% macro task_item(task, url, show_assignee=false) %}
+{% macro task_item(task, url) %}
   <a class="item" hx-get="{{ url }}">
     <span class="icon">{{ task_icon(task) }}</span>
     <span class="grow">
@@ -29,7 +29,6 @@
           {{ task.completed_at.astimezone(tz).strftime("%d.%m %H:%M") if task.completed_at }}
           {%- if task.completed_by %} · {{ task.completed_by.name }}{% endif %}
         {%- endif -%}
-        {%- if show_assignee and task.is_open %} · {{ task.assignee.name if task.assignee else "любой" }}{% endif -%}
       </div>
     </span>
     {{ due_chip(task) }}

@@ -135,9 +135,8 @@ class ServiceJobs:
             admins = await users.telegram_ids(UserRole.ADMIN)
 
             for task in await TaskService(session, self.clock).due_reminders():
-                recipients = [task.assignee.telegram_id] if task.assignee else workers
                 days_left = (task.due_on - today).days
-                await self.notifier.send(recipients, Messages.task_reminder(task, days_left))
+                await self.notifier.send(workers, Messages.task_reminder(task, days_left))
                 task.reminded_on = today
 
             rent = RentService(session, self.clock)

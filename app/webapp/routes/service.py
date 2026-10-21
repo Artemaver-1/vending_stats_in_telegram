@@ -44,7 +44,7 @@ async def _machine_or_404(session: SessionDep, machine_id: int) -> Machine:
 async def home(
     request: Request, user: CurrentUser, tasks: TasksDep, session: SessionDep, clock: ClockDep
 ) -> HTMLResponse:
-    open_tasks = await tasks.open_for(user)
+    open_tasks = await tasks.team_open()
     next_due = {t.machine_id: t.due_on for t in open_tasks if t.kind is TaskKind.INSPECTION}
 
     cards = []
@@ -57,7 +57,7 @@ async def home(
 
     # Weekly checks live on the machine cards, so the task list holds only one-off tasks.
     listed = [t for t in open_tasks if t.kind is TaskKind.CUSTOM]
-    done = [t for t in await tasks.done_by(user, limit=5) if t.kind is TaskKind.CUSTOM]
+    done = await tasks.team_recently_done(TaskKind.CUSTOM, limit=5)
     return render(
         request,
         "service/home.html",

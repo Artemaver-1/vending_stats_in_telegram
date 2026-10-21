@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +13,6 @@ from app.domain.inspection import CHECKLIST, INSPECTION_INTERVAL, MACHINE_WORKS,
 
 TASK_DETAILS = (
     selectinload(Task.machine),
-    selectinload(Task.assignee),
     selectinload(Task.completed_by),
     selectinload(Task.checks),
     # The file body is only needed when the image itself is requested.
@@ -56,22 +55,20 @@ class TaskService:
             select(Task).where(Task.id == task_id).options(*TASK_DETAILS)
         )
 
-    async def open_for(self, user: User) -> Sequence[Task]:
+    async def team_open(self) -> Sequence[Task]:
+        """Everything the service team still has to do; all its members share one list."""
         result = await self.session.scalars(
             select(Task)
-            .where(
-                Task.status == TaskStatus.OPEN,
-                or_(Task.assignee_id.is_(None), Task.assignee_id == user.id),
-            )
+            .where(Task.status == TaskStatus.OPEN)
             .options(*TASK_DETAILS)
             .order_by(Task.due_on, Task.id)
         )
         return result.all()
 
-    async def done_by(self, user: User, limit: int = 10) -> Sequence[Task]:
+    async def team_recently_done(self, kind: TaskKind, limit: int = 10) -> Sequence[Task]:
         result = await self.session.scalars(
             select(Task)
-            .where(Task.status == TaskStatus.DONE, Task.completed_by_id == user.id)
+            .where(Task.status == TaskStatus.DONE, Task.kind == kind)
             .options(*TASK_DETAILS)
             .order_by(Task.completed_at.desc())
             .limit(limit)
@@ -97,7 +94,6 @@ class TaskService:
         author: User,
         description: str | None = None,
         machine_id: int | None = None,
-        assignee_id: int | None = None,
         attachment: NewAttachment | None = None,
     ) -> Task:
         task = Task(
@@ -106,7 +102,6 @@ class TaskService:
             description=(description or "").strip() or None,
             due_on=due_on,
             machine_id=machine_id,
-            assignee_id=assignee_id,
             created_by_id=author.id,
         )
         if attachment is not None:

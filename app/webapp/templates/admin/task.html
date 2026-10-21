@@ -8,7 +8,6 @@
   <table class="plain">
     <tr><td class="muted">Тип</td><td class="right">{{ "Проверка силомера" if task.kind.value == "inspection" else "Разовая задача" }}</td></tr>
     {% if task.machine %}<tr><td class="muted">Силомер</td><td class="right">{{ task.machine.name }}</td></tr>{% endif %}
-    <tr><td class="muted">Исполнитель</td><td class="right">{{ task.assignee.name if task.assignee else "любой из команды" }}</td></tr>
     {% if task.completed_at %}
       <tr><td class="muted">{{ "Выполнено" if task.status.value == "done" else "Отменено" }}</td>
           <td class="right">{{ task.completed_at.astimezone(tz).strftime("%d.%m %H:%M") }}{% if task.completed_by %} · {{ task.completed_by.name }}{% endif %}</td></tr>

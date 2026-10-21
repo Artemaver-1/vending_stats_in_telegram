@@ -62,7 +62,7 @@
     </a>
   {% endif %}
   {% for task in overdue %}
-    {{ task_item(task, "/app/admin/tasks/%d" % task.id, show_assignee=true) }}
+    {{ task_item(task, "/app/admin/tasks/%d" % task.id) }}
   {% endfor %}
   {% for p in rent_due %}
     <a class="item" hx-get="/app/admin/rent">
