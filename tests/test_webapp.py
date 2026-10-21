@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.api.main import create_app
 from app.config import Settings
 from app.db import Database
-from app.db.models import DailyRevenue, Location, Machine, Task, User
+from app.db.models import DailyRevenue, Location, Machine, PaymentAlert, Task, User
 from app.domain.enums import PaymentChannel, RevenueSource, TaskKind, UserRole
 from app.domain.inspection import CHECKLIST
 from tests.helpers import BOT_TOKEN, TZ, FakeNotifier, FixedClock, make_init_data
@@ -523,6 +523,37 @@ async def test_iphone_widget(app: FastAPI, client: httpx.AsyncClient, db: Databa
 
     data = (await client.get(f"/widget/{token}")).json()
     assert data["alerts"] == [{"level": "down", "text": "«Пушкина» стоит 2 дня (сломан)"}]
+    assert data["down"] == [
+        {"machine": "Пушкина", "reason": "сломан", "days": 2, "days_word": "дня"}
+    ]
+    assert data["checks"] == [] and data["machines"] == ["Пушкина"]
+
+    async with db.session() as session:
+        pushkina = await session.scalar(select(Machine))
+        assert pushkina is not None
+        dinamo = Machine(name="Динамо", purchase_cost=Decimal(1))
+        session.add(dinamo)
+        await session.flush()
+        raised = datetime(2026, 10, 20, 9, tzinfo=TZ)
+        for machine, channel in [
+            (dinamo, PaymentChannel.COIN),
+            (dinamo, PaymentChannel.CARD),
+            (pushkina, PaymentChannel.BILL),
+        ]:
+            session.add(
+                PaymentAlert(
+                    machine_id=machine.id,
+                    channel=channel,
+                    raised_at=raised,
+                    recent_sales=30,
+                    recent_hits=0,
+                    quiet_days=2,
+                )
+            )
+    data = (await client.get(f"/widget/{token}")).json()
+    # The broken machine's bill acceptor isn't worth a word while it stands idle.
+    assert data["checks"] == [{"machine": "Динамо", "devices": ["монетоприёмник", "терминал"]}]
+    assert data["machines"] == ["Динамо", "Пушкина"]
     assert data["next_task"] == {"title": "Подшить грушу", "when": "23 октября", "overdue": False}
 
 
