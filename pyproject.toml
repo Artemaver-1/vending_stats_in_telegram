@@ -1,7 +1,7 @@
 [project]
 name = "vending-ops"
 version = "0.3.0"
-description = "Telegram bot and API for running a small strength-tester vending business"
+description = "Telegram Mini App для учёта, обслуживания и инкассации вендинговых силомеров"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

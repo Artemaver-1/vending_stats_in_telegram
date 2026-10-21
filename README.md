@@ -1,125 +1,205 @@
-# Vending Ops
+# Силомеры: учёт и обслуживание вендингового бизнеса
 
-Telegram Mini App for running a small vending business: two strength-tester machines in
-Chelyabinsk. Sales and connectivity are pulled from SmartVend telemetry; the owner gets an
-admin panel with P&L, payback, rent schedule and uptime, the service crew gets a dead-simple
-task list with weekly inspection checklists.
+Telegram Mini App для небольшого вендингового бизнеса: два силомера в Челябинске. Система
+сама собирает продажи и состояние аппаратов из телеметрии, ведёт обслуживание и
+инкассацию через приложение для сотрудника, считает прибыль, аренду и окупаемость и
+показывает, где сейчас лежат деньги бизнеса.
 
-## Roles
+Проект я писал под собственный бизнес. До него учёт жил в тетради, личном кабинете
+SmartVend и выгрузках из Вендисты: аренду я вспоминал, когда звонил арендодатель,
+поломки замечал по провалам выручки, а сколько наличных в аппарате и сколько на счёте,
+приходилось пересчитывать вручную.
 
-- **Admin** — dashboard with a button to pull fresh SmartVend data, tasks for the crew
-  (with a QR code or file attached), "Инфа от работника" — every report the crew files,
-  an income statement (ОФР) for any period and any machine, economics per month,
-  rent contracts with accruals and payment marks,
-  machine status and uptime, team access.
-- **Service** — "Обслуживание силомеров": one-off tasks from the admin and the list of
-  machines. On site the worker opens a machine, sees its state after the previous visit
-  and answers four yes/no questions (machine usable at all, coin acceptor, bill acceptor,
-  Vendista terminal) plus a free comment. Each report is sent to the admin at once.
-  A report counts as the weekly inspection; the next one is due a week later, with
-  reminders two days and one day before. If the machine isn't usable at all it is marked
-  broken and weekly inspections pause until a report says it works again.
+## Что это даёт бизнесу
 
-Everyone who opens the bot is recorded as an access request; admins (from `ADMIN_IDS`)
-let people in from the Team screen.
+- **Выручка без ручного сбора.** Монеты и купюры каждые 30 минут приходят из телеметрии
+  SmartVend, безнал — из выгрузки банковского терминала Вендисты. Повторная загрузка и
+  перезапуск ничего не задваивают.
+- **Простой виден сразу.** При потере связи с аппаратом приходит уведомление в Telegram,
+  а у каждого силомера есть календарь связи по дням, месяцам и годам, в том числе за время
+  до установки телеметрии: эти годы восстановлены по дням с оплатами.
+- **Обслуживание без звонков.** Раз в неделю у сотрудника появляется проверка силомера:
+  четыре вопроса с большими кнопками «Да / Нет» и комментарий. Если силомер не работает,
+  я сразу получаю отчёт, а еженедельные проверки встают на паузу до ремонта.
+- **Деньги прослеживаются от аппарата до счёта.** Сотрудник отмечает, что забрал наличные,
+  вводит суммы со счётной машинки и подтверждает взнос в банк. На каждом шаге сумма
+  сверяется с тем, сколько наличных насчитала телеметрия.
+- **Отчёт о финансовых результатах за любой период.** Выручка по способам оплаты с долями,
+  себестоимость по статьям, налоги, страховые взносы и чистая прибыль, по бизнесу или по
+  отдельному силомеру.
+- **Аренда не забывается.** Начисления по договорам (фиксированная сумма или процент от
+  выручки) с напоминанием за два дня и за день до оплаты.
+- **Расхождения объяснены.** Сверка безнала банка и телеметрии день за днём: какие оплаты
+  телеметрия потеряла во время ремонта, какие записала позже, когда вернулась связь.
 
-## Stack
+## Роли и экраны
 
-- Python 3.12, aiogram 3, FastAPI
-- Mini App: server-rendered Jinja2 + htmx, Telegram theme colours, SVG charts drawn in Python
-- PostgreSQL 16, SQLAlchemy 2 (async), Alembic
-- Docker Compose
+Мини-приложение одно, экран выбирается по роли пользователя. В самом чате бота кнопок
+нет: только приветствие с кнопкой открытия приложения и уведомления.
 
-## Layout
+**Администратор**
+
+| Вкладка | Что внутри |
+|---|---|
+| Главная | Выручка и прибыль за месяц, окупаемость, статус аппаратов, всё, что требует внимания, кнопка обновления данных SmartVend |
+| Задачи | Разовые задачи для обслуживания с датой и вложением (например, QR-код для получения посылки), история выполненных |
+| Инфа | Все отчёты о состоянии силомеров с отметкой новых; комментарий можно дописать, отчёт — удалить |
+| ОФР | Отчёт о финансовых результатах за выбранный период и силомер, график выручки и прибыли по месяцам, расходы, ввод наличных за период до телеметрии |
+| Финансы | Где деньги: в силомерах, у сотрудника, на счёте ИП; история инкассаций, выплаты со счёта по получателям, движение по счёту за год |
+| Аренда | Договоры, начисления по месяцам с отметкой оплаты, график платежей |
+
+Отдельно: аппараты с календарём связи и настройками, сверка безнала Вендисты и SmartVend,
+команда и заявки на доступ.
+
+**Обслуживание.** Экран называется «Обслуживание силомеров», без слова «работник». На нём
+задачи (разовые, «посчитать деньги», «внести в банк») и список силомеров с выручкой за
+30 дней. Отчёт заполняется по силомеру, у которого сотрудник стоит: сверху видно, что было
+после прошлого визита. Отправленный отчёт можно удалить, и график проверок пересчитается.
+Все аккаунты обслуживания видят один и тот же экран и одни данные.
+
+## Архитектура
+
+```
+                Telegram                         SmartVend API      CSV из Вендисты
+                   │                                   │                  │
+        ┌──────────┴──────────┐                        │                  │
+        │                     │                        │                  │
+   ┌────▼────┐   Mini App  ┌──▼───────────┐       ┌────▼────┐             │
+   │   bot   │   (HTTPS)   │  Cloudflare  │       │ worker  │             │
+   │ aiogram │             │    tunnel    │       │APScheduler            │
+   └────┬────┘             └──────┬───────┘       └────┬────┘             │
+        │                  ┌──────▼───────┐            │                  │
+        │                  │     api      │◄───────────┼──── загрузка ────┘
+        │                  │ FastAPI+htmx │            │
+        │                  └──────┬───────┘            │
+        └──────────── services (бизнес-логика) ────────┘
+                                  │
+                           ┌──────▼──────┐     ┌──────────┐
+                           │ PostgreSQL  │────►│  backup  │──► ./backups
+                           └─────────────┘     └──────────┘
+```
+
+Все сервисы описаны в `docker-compose.yml` и поднимаются одной командой. Бот, воркер и
+API работают через один слой сервисов, поэтому правила (как считается прибыль, когда
+силомер считается сломанным) живут в одном месте.
 
 ```
 app/
-  domain/        pure business rules: enums, P&L and payback math, month helpers
-  db/            SQLAlchemy models and session management
-  repositories/  queries, one class per aggregate
-  services/      use cases shared by the bot and the API
-  integrations/  external API clients (SmartVend)
-  worker/        scheduled sync jobs and alerts
-  bot/           aiogram: access requests, menu button, notifications
-  webapp/        Mini App: init-data auth, templates, admin and service screens
-  api/           FastAPI app factory and JSON routes
-migrations/      Alembic revisions
-tests/
+  domain/        чистые правила без БД: ОФР, окупаемость, аренда, оценка связи, сверка
+  db/            модели SQLAlchemy и сессии
+  repositories/  запросы к БД
+  services/      сценарии: синхронизация, задачи, инкассация, финансы, сверка
+  integrations/  клиент SmartVend API и разбор выгрузки Вендисты
+  worker/        фоновые задания и уведомления
+  bot/           доступ, кнопка приложения, уведомления
+  webapp/        Mini App: проверка подписи Telegram, шаблоны, экраны
+  api/           сборка FastAPI-приложения и JSON API
+migrations/      миграции Alembic
+tests/           тесты на PostgreSQL
 ```
 
-## Running
+## Инженерные решения
+
+**Компьютер с ботом иногда выключен.** Это обычный домашний ПК, поэтому ничего не
+рассчитывает на постоянную работу. Telegram хранит сообщения 24 часа, и бот обрабатывает
+их после включения. Каждая синхронизация хранит курсор и при старте догружает пропущенное,
+перечитывая несколько дней назад: контроллер выгружает продажи, сделанные без связи,
+позже. Сырые продажи сохраняются по идентификатору SmartVend, дневная выручка
+пересобирается из них, поэтому повторный запуск ничего не задваивает. Напоминания
+отправляются раз в день в любое время с 10 до 21, так что включение компьютера в обед
+ничего не ломает. Уведомления о связи старше трёх часов не рассылаются, чтобы после
+простоя не пришла пачка устаревших сообщений.
+
+**Безнал берётся из банка, а не из телеметрии.** Сверка показала, что SmartVend теряет
+оплаты картой, пока контроллер в ремонте, а оплаты, накопленные без связи (например, при
+неоплаченной SIM-карте), записывает днём восстановления. Поэтому за период выгрузки
+Вендисты безнал по дням берётся из неё: успешные оплаты минус успешные возвраты, московское
+время терминала переведено в челябинское. SmartVend даёт безнал только за дни после
+последней выгрузки, монеты и купюры — всегда. Карта никогда не учитывается дважды.
+
+**Сверка по эпизодам.** Дневные расхождения группируются: эпизод открывается в первый день
+расхождения и закрывается, когда разница обнуляется (оплаты записаны в другие дни) или
+после недели совпадений (остаток — деньги, которые одна из систем не видела). Каждому
+эпизоду назначается объяснение, к нему добавляется доля времени без связи.
+
+**Связь до установки телеметрии.** Для дат до первых данных SmartVend работа силомера
+оценивается по оплатам Вендисты: одиночный день без оплат считается тихим днём, два и
+больше дня подряд — простоем.
+
+**ОФР за произвольный период.** Фиксированная аренда пропорционально делится по дням
+месяца, процентная считается от выручки ровно за выбранные дни. В отчёте по одному
+силомеру аренда точки делится между аппаратами на ней, а общие расходы — между всеми
+работающими аппаратами.
+
+**Наличные: ожидание и факт.** При инкассации система записывает, сколько купюр и монет
+телеметрия насчитала с прошлого раза, чтобы сравнить с подсчётом на счётной машинке.
+Задачи «посчитать» и «внести в банк» создаются автоматически и не имеют срока.
+
+**Доступ к Mini App.** Каждый запрос несёт `initData` Telegram, сервер проверяет её
+подпись токеном бота и срок жизни. Картинки (QR-коды) браузер грузит без заголовков,
+поэтому для них выдаются короткоживущие подписанные ссылки. JSON API доступен только
+администратору: он открыт через тот же туннель.
+
+**Публичный HTTPS без домена.** Telegram открывает мини-приложения только по HTTPS, а
+компьютер стоит дома за роутером. Быстрый туннель Cloudflare не требует ни домена, ни
+проброса портов. Адрес туннеля меняется при перезапуске, бот читает его из метрик
+туннеля и перенастраивает кнопку меню у всей команды. Ошибки 5xx Cloudflare подменяет
+своей страницей, поэтому неудачи (например, недоступный SmartVend) возвращаются как
+обычный экран с сообщением об ошибке.
+
+**Одна синхронизация за раз.** Воркер и кнопка «Обновить» в админке берут одну и ту же
+advisory-блокировку PostgreSQL. Кнопка не ждёт фоновую синхронизацию, а сразу сообщает,
+что она уже идёт, и быстро отказывается, если SmartVend недоступен: её ждёт человек, а
+туннель обрывает запросы примерно через 100 секунд.
+
+**Интерфейс на сервере.** Экраны рендерятся Jinja2 и подменяются через htmx, JavaScript —
+одна тонкая прослойка: подпись запросов, нативная кнопка «Назад», вибрация, подтверждения
+через диалоги Telegram. Цвета берутся из темы Telegram, графики рисуются в Python как SVG.
+
+## Стек
+
+Python 3.12 · aiogram 3 · FastAPI · SQLAlchemy 2 (async) · Alembic · PostgreSQL 16 ·
+APScheduler · httpx · Pydantic · Jinja2 + htmx · Docker Compose · Cloudflare Tunnel ·
+pytest · ruff · mypy (strict)
+
+## Запуск
 
 ```bash
-cp .env.example .env   # fill in BOT_TOKEN, ADMIN_IDS and SMARTVEND_API_KEY
+cp .env.example .env    # BOT_TOKEN, ADMIN_IDS, SMARTVEND_API_KEY
 docker compose up -d --build
 ```
 
-Migrations run automatically in the `migrate` service before the other services start.
-API docs are at <http://localhost:8000/docs>.
+Миграции применяются сервисом `migrate` до старта остальных. Первый запуск воркера
+загружает всю историю продаж и связи из SmartVend. Выгрузка Вендисты загружается в
+админке: «Аппараты» → «Вендиста».
 
-| Service  | What it does                                                        |
-|----------|---------------------------------------------------------------------|
-| `bot`    | Telegram bot, long polling                                          |
-| `worker` | syncs SmartVend every 5 min (connectivity) and 30 min (sales)       |
-| `api`    | FastAPI: Mini App and JSON API                                      |
-| `tunnel` | Cloudflare quick tunnel giving the Mini App a public HTTPS address  |
-| `db`     | PostgreSQL 16                                                       |
+| Сервис | Назначение |
+|---|---|
+| `bot` | Telegram-бот: доступ, кнопка приложения |
+| `worker` | синхронизация SmartVend (связь — каждые 5 минут, продажи — каждые 30), проверки, напоминания |
+| `api` | Mini App и JSON API |
+| `tunnel` | публичный HTTPS-адрес для Mini App |
+| `db` | PostgreSQL |
+| `backup` | ежедневный `pg_dump` в `./backups`, хранение 30 дней |
 
-Telegram only opens Mini Apps over HTTPS. The quick tunnel needs no account or domain but
-gets a new address on every restart; the bot reads it from the tunnel's metrics endpoint
-and re-points everyone's menu button. Set `WEBAPP_URL` to use a fixed address instead.
+Хосту нужен прямой доступ к `api.smartvend.ru`: сервер не принимает подключения с
+зарубежных адресов, поэтому VPN на этом компьютере должен его пропускать.
 
-Every screen checks the Telegram-signed init data sent by `app.js`; images such as QR codes
-use short-lived signed links because the browser loads them without headers.
-
-## Running on a machine that isn't always on
-
-The host is a home computer that is regularly switched off, so nothing relies on it
-being up:
-
-- Telegram keeps undelivered updates for 24 hours and the bot processes them on start.
-- Each sync stores a cursor in `sync_state`. On boot the worker runs every job immediately
-  and continues from the cursor, re-reading a few extra days because controllers upload
-  sales recorded while they had no signal.
-- Raw sales are upserted by their SmartVend id and daily revenue is rebuilt from them,
-  so re-running a sync never double counts.
-- Connection alerts older than three hours are stored silently instead of arriving as a
-  burst of stale messages after downtime.
-
-## Backups and moving to another computer
-
-Postgres keeps its data in the `pgdata` Docker volume, so it survives container rebuilds
-but lives on this machine only. The `backup` service writes a compressed `pg_dump` to
-`./backups` on start and every 24 hours, keeping 30 days (`BACKUP_KEEP_DAYS`).
+## Резервные копии и перенос на другой компьютер
 
 ```bash
-scripts/backup-now.sh                          # fresh dump into ./backups
-scripts/restore.sh backups/vending-....sql.gz   # load a dump into the running db
+scripts/backup-now.sh                           # свежая копия в ./backups
+scripts/restore.sh backups/vending-....sql.gz   # восстановить копию
 ```
 
-To move: take a fresh dump and stop everything on the old machine (two bots polling the
-same token conflict), then on the new one clone the repo, copy `.env` and the dump,
-`docker compose up -d db`, run `scripts/restore.sh <dump>` and `docker compose up -d`.
+Чтобы переехать, сделайте свежую копию и остановите всё на старом компьютере (два бота
+с одним токеном конфликтуют). На новом: клонировать репозиторий, перенести `.env` и
+копию, `docker compose up -d db`, `scripts/restore.sh <копия>`, `docker compose up -d`.
 
-## Card revenue: Vendista vs SmartVend
+## Разработка
 
-The Vendista terminal records every card payment with the bank's date. SmartVend sees them
-only while it works and has a paid SIM; payments queued while it is offline are booked on
-the day it reconnects, and during repairs it sees nothing at all.
-
-So for every day covered by the latest Vendista export (Admin → Аппараты → Вендиста,
-"Транзакции" CSV) card revenue comes from Vendista: successful payments minus successful
-refunds, Moscow time converted to Chelyabinsk. SmartVend supplies cards only for the days
-after the export; coins and bills always come from SmartVend.
-
-Admin → Аппараты → Сверка безнала compares the two day by day and groups differences into
-episodes: money booked on other days (queue, midnight), days SmartVend saw nothing, payments
-it lost for good, and anything SmartVend shows on top of the bank.
-
-## Development
-
-Tests run against PostgreSQL (`TEST_DATABASE_URL`, defaults to a `vending_test` database
-on localhost):
+Тесты запускаются на настоящем PostgreSQL, потому что расчёты по дням зависят от часовых
+поясов, а SQLite их не хранит:
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
@@ -129,24 +209,6 @@ docker compose exec db createdb -U vending vending_test
 .venv/bin/ruff check . && .venv/bin/mypy app
 ```
 
-The bot chat has no commands or menus: `/start` shows a welcome card with a button that
-opens the Mini App, and the chat otherwise only carries notifications.
-
-## How profit is calculated
-
-The income statement runs top to bottom: revenue by payment channel with its share,
-cost of sales (rent, parts, repair, SIM cards, SmartVend fee, staff, other), taxes,
-insurance contributions, net profit.
-
-- Rent comes from contract terms (fixed amount or a percentage of the location's revenue),
-  so a period's profit is correct before the rent for it is actually paid. A fixed rent is
-  prorated by days when a period covers part of a month; a percentage rent applies to the
-  revenue of exactly those days. Rent entered by hand as an expense is added on top.
-- In a per-machine report the location rent is split evenly between machines at that
-  location, and expenses that aren't tied to a machine are split between active machines.
-- Payback is the first month in which cumulative net profit since launch covers the
-  purchase cost of the machine.
-- Card revenue comes from Vendista for the days its export covers and from SmartVend after
-  that; coins and bills come from SmartVend. A card payment is never counted twice.
-- Days are bucketed in `Asia/Yekaterinburg`, where the machines stand, regardless of the
-  timezone configured on the controllers.
+Около сотни тестов покрывают ОФР, аренду, окупаемость, расписание проверок и сломанные
+аппараты, путь наличных до банка, синхронизацию SmartVend с поздними выгрузками, импорт и
+сверку Вендисты, оценку связи, проверку подписи Telegram и экраны Mini App для обеих ролей.
