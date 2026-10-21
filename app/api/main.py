@@ -37,8 +37,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.notifier = TelegramNotifier(bot)
         smartvend = None
         if settings.smartvend_api_key is not None:
+            # The refresh button waits for this client, and the tunnel drops requests after
+            # about 100 seconds, so here it gives up fast instead of retrying like the worker.
             smartvend = SmartVendClient(
-                settings.smartvend_api_key.get_secret_value(), settings.smartvend_base_url
+                settings.smartvend_api_key.get_secret_value(),
+                settings.smartvend_base_url,
+                timeout=20,
+                connect_timeout=8,
+                retries=1,
             )
             app.state.telemetry = TelemetryJobs(
                 settings, app.state.db, smartvend, app.state.notifier, app.state.clock

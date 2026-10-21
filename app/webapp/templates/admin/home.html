@@ -11,6 +11,9 @@
   </button>
 </div>
 {% if synced_at %}<p class="hint" style="margin:-8px 4px 12px">Данные SmartVend на {{ synced_at.astimezone(tz).strftime("%H:%M %d.%m") }}</p>{% endif %}
+{% for error in sync_errors %}
+  <div class="card alert"><b>⚠️ SmartVend не обновляется</b><p class="hint" style="margin:4px 0 0">{{ error }}</p></div>
+{% endfor %}
 
 <div class="kpis">
   <div class="kpi">

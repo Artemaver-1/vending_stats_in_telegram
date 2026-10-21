@@ -33,14 +33,16 @@
   });
 
   document.body.addEventListener("toast", (event) => showToast(event.detail.value, "success"));
+  document.body.addEventListener("toastError", (event) => showToast(event.detail.value, "error"));
 
   let timer;
   function showToast(text, kind) {
     const el = document.getElementById("toast");
     el.textContent = text;
+    el.classList.toggle("error", kind === "error");
     el.classList.add("show");
     clearTimeout(timer);
-    timer = setTimeout(() => el.classList.remove("show"), 2600);
+    timer = setTimeout(() => el.classList.remove("show"), kind === "error" ? 6000 : 2600);
     if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(kind);
   }
 

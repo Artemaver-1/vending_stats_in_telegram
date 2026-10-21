@@ -71,7 +71,7 @@ def render(
     return with_toast(response, toast) if toast else response
 
 
-def with_toast(response: HTMLResponse, text: str) -> HTMLResponse:
+def with_toast(response: HTMLResponse, text: str, *, error: bool = False) -> HTMLResponse:
     # JSON escapes keep the header ASCII; app.js shows it as a toast with haptics.
-    response.headers["HX-Trigger"] = json.dumps({"toast": text})
+    response.headers["HX-Trigger"] = json.dumps({"toastError" if error else "toast": text})
     return response

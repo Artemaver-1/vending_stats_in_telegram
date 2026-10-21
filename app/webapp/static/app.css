@@ -187,6 +187,7 @@ table.plain tr:first-child td { border-top: 0; }
   font-weight: 600; opacity: 0; transition: 0.25s; pointer-events: none; z-index: 20; max-width: 90vw;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.error { background: rgb(190 40 45 / 95%); }
 
 .loader { padding: 60px 0; text-align: center; color: var(--hint); }
 .htmx-indicator { opacity: 0; transition: opacity 0.2s; }

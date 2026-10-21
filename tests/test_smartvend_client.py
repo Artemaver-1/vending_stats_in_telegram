@@ -93,3 +93,13 @@ async def test_server_errors_are_retried(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert calls == 3
     assert controllers[0].online
+
+
+async def test_unreachable_server_explains_itself() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("handshake timed out", request=request)
+
+    async with SmartVendClient("k", retries=1, transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(SmartVendError) as raised:
+            await client.controllers()
+    assert "VPN" in raised.value.reason

@@ -14,8 +14,26 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 1000
 
 
+UNREACHABLE = (
+    "Сервер SmartVend не отвечает. Если на компьютере с ботом включён VPN, "
+    "добавьте smartvend.ru в исключения VPN или выключите его."
+)
+
+
 class SmartVendError(Exception):
-    pass
+    """`reason` is a sentence for people; the exception text keeps technical details."""
+
+    def __init__(self, message: str, reason: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+def _transport_reason(exc: httpx.TransportError) -> str:
+    if isinstance(exc, httpx.ConnectError | httpx.ConnectTimeout):
+        return UNREACHABLE
+    if isinstance(exc, httpx.TimeoutException):
+        return "SmartVend отвечает слишком долго, попробуйте позже."
+    return "Не удалось связаться с SmartVend."
 
 
 class SmartVendClient:
@@ -31,13 +49,14 @@ class SmartVendClient:
         base_url: str = "https://api.smartvend.ru/v1.2",
         *,
         timeout: float = 30.0,
+        connect_timeout: float = 10.0,
         retries: int = 3,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._http = httpx.AsyncClient(
             base_url=base_url.rstrip("/") + "/",
             headers={"Authorization": f"Bearer {api_key}"},
-            timeout=timeout,
+            timeout=httpx.Timeout(timeout, connect=connect_timeout),
             transport=transport,
         )
         self._retries = retries
@@ -98,7 +117,9 @@ class SmartVendClient:
                 response = await self._http.post(endpoint, json=payload)
             except httpx.TransportError as exc:
                 if attempt == self._retries:
-                    raise SmartVendError(f"{endpoint}: {exc}") from exc
+                    raise SmartVendError(
+                        f"{endpoint}: {type(exc).__name__} {exc}", _transport_reason(exc)
+                    ) from exc
             else:
                 if response.status_code < 500 or attempt == self._retries:
                     return self._unwrap(endpoint, response)
@@ -114,9 +135,15 @@ class SmartVendClient:
         try:
             result = response.json()["result"]
         except (ValueError, KeyError) as exc:
-            raise SmartVendError(f"{endpoint}: unexpected response {response.status_code}") from exc
+            raise SmartVendError(
+                f"{endpoint}: unexpected response {response.status_code}",
+                f"SmartVend временно недоступен (ошибка {response.status_code}).",
+            ) from exc
         if result.get("$case") != "success":
             failure = result.get("failure", {})
-            raise SmartVendError(f"{endpoint}: {failure.get('code')} {failure.get('message')}")
+            raise SmartVendError(
+                f"{endpoint}: {failure.get('code')} {failure.get('message')}",
+                f"SmartVend вернул ошибку: {failure.get('message') or failure.get('code')}.",
+            )
         success: dict[str, Any] = result["success"]
         return success

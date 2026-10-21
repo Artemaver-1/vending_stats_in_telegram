@@ -123,16 +123,23 @@ async def test_worker_report_reaches_admin(
 async def test_refresh_button_runs_sync(app: FastAPI, client: httpx.AsyncClient) -> None:
     class FakeTelemetry:
         calls = 0
+        failure: str | None = None
 
-        async def refresh_all(self) -> bool:
+        async def refresh_all(self) -> str | None:
             self.calls += 1
-            return True
+            return self.failure
 
     fake = FakeTelemetry()
     app.state.telemetry = fake
     response = await client.post("/app/admin/sync", headers=as_user(ADMIN_TG))
     assert response.status_code == 200 and fake.calls == 1
     assert (await client.post("/app/admin/sync", headers=as_user(WORKER_TG))).status_code == 403
+
+    # When SmartVend can't be reached the reason reaches the admin's toast.
+    fake.failure = "Сервер SmartVend не отвечает."
+    failed = await client.post("/app/admin/sync", headers=as_user(ADMIN_TG))
+    assert failed.status_code == 200
+    assert "toastError" in failed.headers["HX-Trigger"]
 
 
 async def test_admin_creates_task_with_qr_for_worker(
