@@ -21,6 +21,8 @@ class User(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(default=False)
     # Secret in the iPhone widget's address; the widget has no Telegram session to sign with.
     widget_token: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # Day the loading video last played for this person; it plays once a day.
+    splash_seen_on: Mapped[date | None]
 
     @property
     def is_admin(self) -> bool:

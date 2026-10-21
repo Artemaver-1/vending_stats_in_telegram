@@ -524,3 +524,16 @@ async def test_iphone_widget(app: FastAPI, client: httpx.AsyncClient, db: Databa
     data = (await client.get(f"/widget/{token}")).json()
     assert data["alerts"] == [{"level": "down", "text": "«Пушкина» стоит 2 дня (сломан)"}]
     assert data["next_task"] == {"title": "Подшить грушу", "when": "23 октября", "overdue": False}
+
+
+async def test_loading_video_once_a_day(app: FastAPI, client: httpx.AsyncClient) -> None:
+    first = await client.get("/app/service", headers=as_user(WORKER_TG))
+    again = await client.get("/app/service", headers=as_user(WORKER_TG))
+    assert "splash.mp4" in first.text and "splash.mp4" not in again.text
+
+    app.state.clock.shift(days=1)
+    tomorrow = await client.get("/app/service", headers=as_user(WORKER_TG))
+    assert "splash.mp4" in tomorrow.text
+    # Admins looking at the service screen never get it.
+    admin = await client.get("/app/service", headers=as_user(ADMIN_TG))
+    assert "splash.mp4" not in admin.text

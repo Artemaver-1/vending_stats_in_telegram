@@ -2,12 +2,12 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, Response
 
+from app import __version__
 from app.api.deps import ClockDep, SessionDep
 from app.db.models import Encashment, Machine, Task
 from app.domain.enums import TaskKind, UserRole
@@ -24,10 +24,6 @@ from app.webapp.routes.machines import MachineRevenue, machine_revenue
 from app.webapp.templating import render, with_toast
 
 router = APIRouter(prefix="/app/service")
-
-STATIC_DIR = Path(__file__).parent.parent / "static"
-# The worker's own car on the loading screen; the drawn one stands in until it's added.
-CAR_PHOTO = "car.png"
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +67,11 @@ async def home(
     # Weekly checks live on the machine cards; the list holds one-off and cash tasks.
     listed = [t for t in open_tasks if t.kind is not TaskKind.INSPECTION]
     done = await tasks.team_recently_done(TaskKind.CUSTOM, limit=5)
+    # The car video greets the crew on their first visit of the day only.
+    show_splash = not user.is_admin and user.splash_seen_on != clock.today()
+    if show_splash:
+        user.splash_seen_on = clock.today()
+        await session.commit()
     return render(
         request,
         "service/home.html",
@@ -81,7 +82,8 @@ async def home(
         machines=cards,
         done=done,
         back="/app/admin" if user.is_admin else None,
-        car_photo=CAR_PHOTO if (STATIC_DIR / CAR_PHOTO).exists() else None,
+        show_splash=show_splash,
+        version=__version__,
     )
 
 

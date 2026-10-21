@@ -1,6 +1,6 @@
 {% from "components.html" import task_item, down_banner, payment_alert_card with context %}
 {% if back %}<div data-back="{{ back }}"></div>{% endif %}
-{% if not user.is_admin %}{% include "service/car_splash.html" %}{% endif %}
+{% if show_splash %}{% include "service/car_splash.html" %}{% endif %}
 <h1>Обслуживание силомеров</h1>
 <p class="subtitle">{{ user.name }}, вот что нужно сделать</p>
 {% for d in downtimes %}{{ down_banner(d, report_button=true) }}{% endfor %}

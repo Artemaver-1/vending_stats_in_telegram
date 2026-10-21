@@ -1,35 +1,7 @@
-{# Loading screen of the service app: the worker's car starts up in a night garage while
-   the first screen loads, then everything dissolves into the task list. #}
+{# Loading screen of the service app: the worker's car starts up and drives off, then the
+   screen dissolves into the task list. #}
 <div id="car-splash" class="car-splash" hidden>
-  <div class="garage">
-    <div class="garage-word">СИЛОМЕРЫ</div>
-    <div class="garage-sweep"></div>
-    <div class="garage-floor"></div>
-  </div>
-
-  <div class="splash-top">
-    <div class="splash-title">Обслуживание силомеров</div>
-    <div class="splash-sub">Челябинск · силомеры.рф</div>
-  </div>
-
-  <div class="car-stage {{ 'photo' if car_photo }}">
-    <div class="halo"></div>
-    {% if car_photo %}
-      <img class="car car-photo" src="/static/{{ car_photo }}" alt="Синяя Лада Гранта, Х468МО 774">
-      {# Headlight positions as a share of the photo, measured on the picture itself. #}
-      <span class="flare" style="left:60.4%; top:57.8%"></span>
-      <span class="flare" style="left:93.6%; top:54.3%"></span>
-      <div class="beams beams-photo"></div>
-    {% else %}
-      {% include "service/car_svg.html" %}
-      <div class="beams"></div>
-    {% endif %}
-    <div class="neon"></div>
-  </div>
-
-  <div class="splash-bottom">
-    <div class="plate-badge"><b>Х 468 МО</b><span>774<small>RUS</small></span></div>
-    <div class="loading-text">Заводим Гранту…</div>
-    <div class="loading-bar"><i></i></div>
-  </div>
+  <video src="/static/splash.mp4?v={{ version }}" poster="/static/splash-poster.jpg" playsinline preload="auto"></video>
+  <div class="splash-label">Загрузка</div>
+  <button class="splash-tap" type="button" hidden>🔑 Нажми, чтобы завести</button>
 </div>
