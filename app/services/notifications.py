@@ -9,8 +9,8 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BufferedInputFile
 
-from app.db.models import ConnectionEvent, Encashment, RentPayment, Task
-from app.formatting import human_date, month_title, plural, rub
+from app.db.models import ConnectionEvent, Encashment, PaymentAlert, RentPayment, Task
+from app.formatting import CHANNEL_DEVICES, human_date, month_title, plural, rub
 from app.services.downtime import Downtime
 from app.services.tasks import InspectionOutcome
 
@@ -179,3 +179,22 @@ class Messages:
             "Когда заработает — заполните отчёт по силомеру.",
         ]
         return "\n".join(lines)
+
+    @staticmethod
+    def from_admin(author: str, text: str) -> str:
+        return f"✉️ <b>Сообщение от {escape(author)}</b>\n\n{escape(text.strip())}"
+
+    @staticmethod
+    def payment_alert(alert: PaymentAlert) -> str:
+        device = CHANNEL_DEVICES[alert.channel]
+        name = escape(alert.machine.name)
+        return (
+            f"⚠️ <b>«{name}»: проверьте {device}!</b>\n"
+            f"Силомер продаёт ({alert.recent_sales} оплат за 2 дня), а этим способом "
+            "за это время почти никто не заплатил. Возможно, он плохо работает или сломан."
+        )
+
+    @staticmethod
+    def payment_alert_cleared(alert: PaymentAlert) -> str:
+        device = CHANNEL_DEVICES[alert.channel]
+        return f"✅ «{escape(alert.machine.name)}»: {device} снова принимает оплату."

@@ -100,10 +100,12 @@ async def income_statement(
         machines=await MachineRepository(session).list_active(),
         selected=machine,
         all_time=all_time,
-        presets={
-            "this_month": (month_start(today), today),
-            "last_month": (last_month, month_start(today) - timedelta(days=1)),
-        },
+        presets=[
+            ("За день", today, today),
+            ("За неделю", today - timedelta(days=6), today),
+            ("Этот месяц", month_start(today), today),
+            ("Прошлый месяц", last_month, month_start(today) - timedelta(days=1)),
+        ],
         toast=toast,
     )
 

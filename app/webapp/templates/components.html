@@ -77,3 +77,17 @@
     {% endif %}
   </div>
 {% endmacro %}
+
+{% macro payment_alert_card(alert, report_button=false) %}
+  <div class="card warn payment-alert">
+    <b>⚠️ «{{ alert.machine.name }}»: проверьте {{ CHANNEL_DEVICES[alert.channel] }}!</b>
+    <p class="hint" style="margin:4px 0 0">
+      Силомер продаёт, а этим способом уже 2 дня почти никто не платит. Возможно, он плохо
+      работает или сломан. Заметили {{ alert.raised_at.astimezone(tz).strftime("%d.%m в %H:%M") }}.
+    </p>
+    {% if report_button %}
+      <button class="btn small" style="margin-top:10px" hx-get="/app/service/machines/{{ alert.machine_id }}/report">🔧 Проверил — заполнить отчёт</button>
+    {% endif %}
+  </div>
+{% endmacro %}
+

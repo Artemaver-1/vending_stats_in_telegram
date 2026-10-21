@@ -17,6 +17,13 @@ MONTHS_SHORT = (
 )  # fmt: skip
 WEEKDAYS = ("пн", "вт", "ср", "чт", "пт", "сб", "вс")
 
+# The device behind each payment method, for "проверьте ..." messages.
+CHANNEL_DEVICES = {
+    PaymentChannel.COIN: "монетоприёмник",
+    PaymentChannel.BILL: "купюроприёмник",
+    PaymentChannel.CARD: "терминал безнала (Вендиста)",
+}
+
 CHANNEL_LABELS = {
     PaymentChannel.COIN: "Монеты",
     PaymentChannel.BILL: "Купюры",

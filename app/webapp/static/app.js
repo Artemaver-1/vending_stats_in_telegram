@@ -30,6 +30,7 @@
     window.scrollTo({ top: 0 });
     const back = document.querySelector("#view [data-back]");
     if (tg) back ? tg.BackButton.show() : tg.BackButton.hide();
+    if (window.showCarSplash) window.showCarSplash();
   });
 
   document.body.addEventListener("htmx:responseError", (event) => {

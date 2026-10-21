@@ -3,6 +3,13 @@
 <h1>Команда</h1>
 <p class="subtitle">Новый человек появится здесь, когда откроет бота</p>
 
+<form class="card" hx-post="/app/admin/team/message">
+  <b>✉️ Написать команде обслуживания</b>
+  <p class="hint" style="margin:4px 0 10px">Придёт уведомлением в чат с ботом всем, у кого открыт доступ</p>
+  <textarea name="text" required maxlength="3500" placeholder="Например: завтра в 10:00 привезут грушу на Пушкина"></textarea>
+  <button class="btn" type="submit" style="margin-top:8px">Отправить</button>
+</form>
+
 {% set pending = users | rejectattr("is_active") | list %}
 {% if pending %}
 <h2>Просят доступ</h2>

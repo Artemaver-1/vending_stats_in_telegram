@@ -1,6 +1,6 @@
 [project]
 name = "vending-ops"
-version = "0.3.0"
+version = "0.4.0"
 description = "Telegram Mini App для учёта, обслуживания и инкассации вендинговых силомеров"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -35,7 +35,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["webapp/templates/**/*.html", "webapp/static/*", "bot/assets/*"]
+app = ["webapp/templates/**/*.html", "webapp/static/*", "webapp/widget/*", "bot/assets/*"]
 
 [tool.ruff]
 line-length = 100

@@ -16,12 +16,10 @@
     </label>
   </div>
   <div class="row" style="flex-wrap:wrap; gap:8px">
-    {% set this_start, this_end = presets.this_month %}
-    {% set last_start, last_end = presets.last_month %}
-    <button type="button" class="btn small {{ '' if (s.start, s.end) == (this_start, this_end) and not all_time else 'secondary' }}"
-            hx-get="/app/admin/ofr?start={{ this_start }}&end={{ this_end }}{{ machine_q }}">Этот месяц</button>
-    <button type="button" class="btn small {{ '' if (s.start, s.end) == (last_start, last_end) else 'secondary' }}"
-            hx-get="/app/admin/ofr?start={{ last_start }}&end={{ last_end }}{{ machine_q }}">Прошлый месяц</button>
+    {% for label, first, last in presets %}
+      <button type="button" class="btn small {{ '' if (s.start, s.end) == (first, last) and not all_time else 'secondary' }}"
+              hx-get="/app/admin/ofr?start={{ first }}&end={{ last }}{{ machine_q }}">{{ label }}</button>
+    {% endfor %}
     <button type="button" class="btn small {{ '' if all_time else 'secondary' }}"
             hx-get="/app/admin/ofr?all_time=true{{ machine_q }}">За всё время</button>
   </div>

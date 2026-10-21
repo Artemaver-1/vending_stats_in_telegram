@@ -19,6 +19,8 @@ class User(TimestampMixin, Base):
     username: Mapped[str | None] = mapped_column(String(64))
     # Someone who pressed /start but hasn't been let in by an admin yet.
     is_active: Mapped[bool] = mapped_column(default=False)
+    # Secret in the iPhone widget's address; the widget has no Telegram session to sign with.
+    widget_token: Mapped[str | None] = mapped_column(String(64), unique=True)
 
     @property
     def is_admin(self) -> bool:

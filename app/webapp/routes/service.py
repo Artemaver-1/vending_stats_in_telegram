@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, status
@@ -15,6 +16,7 @@ from app.repositories import MachineRepository
 from app.services.cash import CashError, EncashmentService
 from app.services.downtime import DowntimeService
 from app.services.notifications import Messages
+from app.services.payment_watch import PaymentWatch
 from app.services.tasks import TaskError
 from app.webapp.auth import CurrentUser
 from app.webapp.deps import NotifierDep, TasksDep, UsersDep
@@ -22,6 +24,10 @@ from app.webapp.routes.machines import MachineRevenue, machine_revenue
 from app.webapp.templating import render, with_toast
 
 router = APIRouter(prefix="/app/service")
+
+STATIC_DIR = Path(__file__).parent.parent / "static"
+# The worker's own car on the loading screen; the drawn one stands in until it's added.
+CAR_PHOTO = "car.png"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,11 +75,13 @@ async def home(
         request,
         "service/home.html",
         downtimes=await DowntimeService(session, clock).all_down(),
+        payment_alerts=await PaymentWatch(session, clock).open_alerts(),
         user=user,
         tasks=listed,
         machines=cards,
         done=done,
         back="/app/admin" if user.is_admin else None,
+        car_photo=CAR_PHOTO if (STATIC_DIR / CAR_PHOTO).exists() else None,
     )
 
 

@@ -18,9 +18,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import ClockDep, SessionDep
 from app.db.models import Machine, Task, User
-from app.formatting import rub
+from app.domain.enums import UserRole
+from app.formatting import plural, rub
 from app.integrations.vendista import VendistaExportError, read_transactions
 from app.repositories import MachineRepository
+from app.services.notifications import Messages
 from app.services.uptime import UptimeService
 from app.services.vendista import VendistaImporter
 from app.webapp.auth import AdminUser
@@ -199,4 +201,23 @@ async def change_access(
         toast = f"{user.name} теперь в команде"
     else:
         toast = f"Доступ для {user.name} закрыт"
+    return await team_page(request, admin, session, users, toast=toast)
+
+
+@router.post("/team/message", response_class=HTMLResponse)
+async def message_team(
+    request: Request,
+    admin: AdminUser,
+    session: SessionDep,
+    users: UsersDep,
+    notifier: NotifierDep,
+    background: BackgroundTasks,
+    text: Annotated[str, Form(min_length=1, max_length=3500)],
+) -> HTMLResponse:
+    recipients = await users.telegram_ids(UserRole.WORKER)
+    if not recipients:
+        raise HTTPException(status.HTTP_409_CONFLICT, "В команде обслуживания пока никого нет")
+    background.add_task(notifier.send, recipients, Messages.from_admin(admin.name, text))
+    people = len(recipients)
+    toast = f"Отправлено: {people} {plural(people, 'человеку', 'людям', 'людям')}"
     return await team_page(request, admin, session, users, toast=toast)

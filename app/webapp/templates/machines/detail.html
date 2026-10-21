@@ -1,4 +1,4 @@
-{% from "components.html" import uptime_grid, check_results, down_banner with context %}
+{% from "components.html" import uptime_grid, check_results, down_banner, payment_alert_card with context %}
 {% set base = "/app/machines/%d" % machine.id %}
 <div data-back="{{ back }}"></div>
 <h1>{{ machine.name }}</h1>
@@ -11,6 +11,7 @@
 </p>
 
 {% if downtime %}{{ down_banner(downtime, report_button=true) }}{% endif %}
+{% for a in payment_alerts %}{{ payment_alert_card(a, report_button=true) }}{% endfor %}
 <div class="kpis">
   <div class="kpi">
     <div class="label">Выручка за 30 дней</div>

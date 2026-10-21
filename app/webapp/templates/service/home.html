@@ -1,8 +1,10 @@
-{% from "components.html" import task_item, down_banner with context %}
+{% from "components.html" import task_item, down_banner, payment_alert_card with context %}
 {% if back %}<div data-back="{{ back }}"></div>{% endif %}
+{% if not user.is_admin %}{% include "service/car_splash.html" %}{% endif %}
 <h1>Обслуживание силомеров</h1>
 <p class="subtitle">{{ user.name }}, вот что нужно сделать</p>
 {% for d in downtimes %}{{ down_banner(d, report_button=true) }}{% endfor %}
+{% for a in payment_alerts %}{{ payment_alert_card(a, report_button=true) }}{% endfor %}
 
 <h2>Задачи</h2>
 <div class="list">
@@ -45,3 +47,13 @@
     {% endfor %}
   </div>
 {% endif %}
+
+<h2>Виджет на iPhone</h2>
+<button class="item refresh card" style="margin-bottom:10px" hx-post="/app/service/widget" hx-disabled-elt="this">
+  <span class="icon">📱</span>
+  <span class="grow">
+    <div class="title"><span class="idle">Получить виджет для экрана «Домой»</span><span class="busy">Готовлю…</span></div>
+    <div class="meta">Следующая задача и тревоги — без открытия приложения</div>
+  </span>
+</button>
+

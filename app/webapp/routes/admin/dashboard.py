@@ -15,6 +15,7 @@ from app.repositories import MachineRepository
 from app.services.downtime import DowntimeService
 from app.services.export import AI_PROMPT, DataExporter
 from app.services.finance import FinanceService
+from app.services.payment_watch import PaymentWatch
 from app.webapp.auth import AdminUser
 from app.webapp.deps import NotifierDep, RentDep, TasksDep, UsersDep
 from app.webapp.routes.admin.common import admin_page
@@ -75,6 +76,7 @@ async def home(
         pending_users=pending_users,
         month_name=MONTHS_GENITIVE[today.month - 1],
         downtimes=await DowntimeService(session, clock).all_down(),
+        payment_alerts=await PaymentWatch(session, clock).open_alerts(),
         synced_at=max(checked) if checked else None,
         sync_errors=sorted(e for e in sync_errors if e),
         toast=toast,

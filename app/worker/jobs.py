@@ -13,6 +13,7 @@ from app.integrations.smartvend import SmartVendClient, SmartVendError
 from app.repositories.telemetry import SyncStateRepository
 from app.services.downtime import DowntimeService
 from app.services.notifications import Messages, Notifier
+from app.services.payment_watch import PaymentWatch
 from app.services.rent import RentService
 from app.services.staff import UserService
 from app.services.tasks import TaskService
@@ -137,6 +138,20 @@ class ServiceJobs:
         self.db = db
         self.notifier = notifier
         self.clock = clock
+
+    async def watch_payments(self) -> None:
+        """Runs on its own schedule so it still works on the sales already stored when
+        SmartVend itself can't be reached."""
+        async with self.db.session() as session:
+            watch = await PaymentWatch(session, self.clock).run()
+            users = UserService(session)
+            team = await users.telegram_ids(UserRole.ADMIN) + await users.telegram_ids(
+                UserRole.WORKER
+            )
+            for alert in watch.raised:
+                await self.notifier.send(team, Messages.payment_alert(alert))
+            for alert in watch.cleared:
+                await self.notifier.send(team, Messages.payment_alert_cleared(alert))
 
     async def schedule_inspections(self) -> None:
         async with self.db.session() as session:

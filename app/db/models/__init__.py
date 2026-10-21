@@ -11,7 +11,12 @@ from app.db.models.staff import (
     Task,
     User,
 )
-from app.db.models.telemetry import ConnectionEvent, EstimatedUptime, TelemetrySale
+from app.db.models.telemetry import (
+    ConnectionEvent,
+    EstimatedUptime,
+    PaymentAlert,
+    TelemetrySale,
+)
 
 __all__ = [
     "Attachment",
@@ -28,6 +33,7 @@ __all__ = [
     "Location",
     "Machine",
     "Milestone",
+    "PaymentAlert",
     "Payout",
     "RentContract",
     "RentPayment",

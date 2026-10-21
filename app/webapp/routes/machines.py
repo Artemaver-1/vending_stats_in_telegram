@@ -11,6 +11,7 @@ from app.db.models import Machine
 from app.domain.periods import month_start, next_month, previous_month
 from app.services.downtime import DowntimeService
 from app.services.finance import FinanceService
+from app.services.payment_watch import PaymentWatch
 from app.services.uptime import UptimeService
 from app.webapp.auth import CurrentUser
 from app.webapp.deps import TasksDep
@@ -86,6 +87,7 @@ async def machine_page(
         revenue=await machine_revenue(session, machine, today),
         reports=await tasks.reports(machine.id, limit=5),
         downtime=await DowntimeService(session, clock).for_machine(machine),
+        payment_alerts=await PaymentWatch(session, clock).open_alerts(machine.id),
         view=view,
         year=year,
         years=years,

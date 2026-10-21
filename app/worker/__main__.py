@@ -45,6 +45,7 @@ async def main() -> None:
     scheduler.add_job(jobs.sync_connectivity, "interval", minutes=5, **job_defaults)
     scheduler.add_job(jobs.sync_sales, "interval", minutes=30, **job_defaults)
     scheduler.add_job(service.schedule_inspections, "interval", hours=1, **job_defaults)
+    scheduler.add_job(service.watch_payments, "interval", minutes=30, **job_defaults)
     # Reminders go out once a day; checking hourly from 10 to 21 still catches days
     # when the computer is switched on late.
     scheduler.add_job(

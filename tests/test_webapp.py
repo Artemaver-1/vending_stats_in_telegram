@@ -502,3 +502,25 @@ async def test_export_for_ai(app: FastAPI, client: httpx.AsyncClient) -> None:
     assert str(ADMIN_TG) not in users and "telegram_id" not in users
     # The prompt also arrives as a message ready to copy.
     assert "аналитик" in notifier(app).sent[-1][1]
+
+
+async def test_iphone_widget(app: FastAPI, client: httpx.AsyncClient, db: Database) -> None:
+    assert (await client.get("/widget/not-a-token")).status_code == 404
+
+    sent = await client.post("/app/service/widget", headers=as_user(WORKER_TG))
+    assert sent.status_code == 200
+    ((chat_id, filename, script),) = notifier(app).documents
+    assert chat_id == WORKER_TG and filename.endswith(".js")
+    async with db.session() as session:
+        worker = await session.scalar(select(User).where(User.telegram_id == WORKER_TG))
+        assert worker is not None and worker.widget_token
+        token = worker.widget_token
+        assert token in script.decode()
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        machine.broken_since = datetime(2026, 10, 19, 9, tzinfo=TZ)
+        session.add(Task(kind=TaskKind.CUSTOM, title="Подшить грушу", due_on=date(2026, 10, 23)))
+
+    data = (await client.get(f"/widget/{token}")).json()
+    assert data["alerts"] == [{"level": "down", "text": "«Пушкина» стоит 2 дня (сломан)"}]
+    assert data["next_task"] == {"title": "Подшить грушу", "when": "23 октября", "overdue": False}

@@ -5,6 +5,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramAPIError
 
 from app.bot.handlers import build_router
 from app.bot.middlewares import AccessMiddleware, DatabaseMiddleware
@@ -32,11 +33,22 @@ async def keep_menu_buttons_fresh(bot: Bot, db: Database, webapp: WebAppLink) ->
     while True:
         if await webapp.refresh():
             logger.info("Mini App is now at %s", webapp.url)
+            await publish_address(bot, webapp)
             async with db.session() as session:
                 users = [u for u in await UserService(session).list_all() if u.is_active]
             await webapp.apply(bot, users)
         # Until the tunnel reports its address, ask often so /start works soon after boot.
         await asyncio.sleep(LINK_CHECK_SECONDS if webapp.url else 5)
+
+
+async def publish_address(bot: Bot, webapp: WebAppLink) -> None:
+    """The iPhone widget can't ask the bot, but it can read the bot's public profile page,
+    so the current address goes into the short description."""
+    if webapp.url is None:
+        return
+    base = webapp.url.removesuffix("/app")
+    with contextlib.suppress(TelegramAPIError):
+        await bot.set_my_short_description(f"Задачи и статистика силомеров · {base}")
 
 
 async def bootstrap_admins(db: Database, settings: Settings) -> None:

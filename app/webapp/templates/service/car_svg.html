@@ -1,0 +1,62 @@
+{# Drawn stand-in for the car photo. #}
+<svg class="car" viewBox="0 0 320 240" role="img" aria-label="Синяя Лада Гранта, Х468МО 774">
+      <defs>
+        <radialGradient id="beam-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#fffbe0" stop-opacity="1"/>
+          <stop offset="0.45" stop-color="#ffe680" stop-opacity="0.75"/>
+          <stop offset="1" stop-color="#ffd23f" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3d7be0"/>
+          <stop offset="1" stop-color="#1b4fa8"/>
+        </linearGradient>
+        <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#cfe6ff"/>
+          <stop offset="1" stop-color="#7fa9d9"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="160" cy="214" rx="132" ry="12" fill="#000" opacity="0.18"/>
+      <g class="car-body">
+        <!-- wheels -->
+        <rect x="44" y="168" width="40" height="48" rx="10" fill="#1d1f24"/>
+        <rect x="236" y="168" width="40" height="48" rx="10" fill="#1d1f24"/>
+        <!-- mirrors -->
+        <rect x="26" y="96" width="26" height="16" rx="6" fill="#1b4fa8"/>
+        <rect x="268" y="96" width="26" height="16" rx="6" fill="#1b4fa8"/>
+        <!-- cabin -->
+        <path d="M78 104 L100 52 Q104 44 114 44 L206 44 Q216 44 220 52 L242 104 Z" fill="url(#body)"/>
+        <path d="M92 100 L110 58 Q112 54 118 54 L202 54 Q208 54 210 58 L228 100 Z" fill="url(#glass)"/>
+        <path d="M120 60 L135 60 L118 98 L104 98 Z" fill="#fff" opacity="0.35"/>
+        <!-- body -->
+        <path d="M40 112 Q44 100 60 100 L260 100 Q276 100 280 112 L290 176 Q292 192 276 192 L44 192 Q28 192 30 176 Z" fill="url(#body)"/>
+        <rect x="40" y="104" width="240" height="6" rx="3" fill="#fff" opacity="0.18"/>
+        <!-- grille with the boat emblem -->
+        <rect x="112" y="122" width="96" height="30" rx="10" fill="#14161b"/>
+        <path d="M150 128 L170 128 L174 137 L160 147 L146 137 Z" fill="#d9dde3"/>
+        <path d="M156 131 L164 131 L166 137 L160 142 L154 137 Z" fill="#14161b"/>
+        <!-- headlights -->
+        <g class="headlight">
+          <path d="M52 122 Q54 116 62 116 L100 118 Q106 119 104 126 L100 140 Q98 146 90 146 L58 144 Q50 143 50 136 Z" fill="#e9eef5"/>
+          <ellipse class="lamp" cx="76" cy="131" rx="16" ry="10" fill="#ffffff"/>
+        </g>
+        <g class="headlight">
+          <path d="M268 122 Q266 116 258 116 L220 118 Q214 119 216 126 L220 140 Q222 146 230 146 L262 144 Q270 143 270 136 Z" fill="#e9eef5"/>
+          <ellipse class="lamp" cx="244" cy="131" rx="16" ry="10" fill="#ffffff"/>
+        </g>
+        <ellipse class="glow" cx="76" cy="131" rx="52" ry="36" fill="url(#beam-glow)"/>
+        <ellipse class="glow" cx="244" cy="131" rx="52" ry="36" fill="url(#beam-glow)"/>
+        <!-- bumper and plate: Х 468 МО 774 -->
+        <rect x="44" y="160" width="232" height="22" rx="10" fill="#163f88"/>
+        <g transform="translate(104 158)">
+          <rect width="112" height="26" rx="4" fill="#fff" stroke="#111" stroke-width="2"/>
+          <text x="40" y="19" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="16" fill="#111">Х468МО</text>
+          <line x1="80" y1="3" x2="80" y2="23" stroke="#111" stroke-width="1.5"/>
+          <text x="96" y="14" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="11" fill="#111">774</text>
+          <text x="96" y="22" text-anchor="middle" font-family="Arial, sans-serif" font-size="5" fill="#111">RUS</text>
+        </g>
+      </g>
+      <g class="exhaust">
+        <circle cx="292" cy="196" r="7" fill="#c7cbd1"/>
+        <circle cx="304" cy="186" r="10" fill="#d9dde3"/>
+      </g>
+    </svg>
