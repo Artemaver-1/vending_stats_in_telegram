@@ -173,11 +173,9 @@ class Messages:
         name = escape(downtime.machine.name)
         days = f"{downtime.days} {plural(downtime.days, 'день', 'дня', 'дней')}"
         why = "сломан" if downtime.broken else "нет связи"
-        lines = [f"🚨🚨🚨 <b>«{name}» стоит уже {days}</b> ({why})"]
-        if downtime.daily_loss:
-            lines.append(
-                f"Упущено ≈ <b>{rub(downtime.lost)}</b>, каждый день простоя — "
-                f"минус {rub(downtime.daily_loss)}."
-            )
-        lines.append("Чините как можно скорее! Когда заработает — заполните отчёт по силомеру.")
+        lines = [
+            f"🚨🚨🚨 <b>«{name}» стоит уже {days}!</b> ({why})",
+            "Силомер не работает — чините как можно скорее! 🔧",
+            "Когда заработает — заполните отчёт по силомеру.",
+        ]
         return "\n".join(lines)

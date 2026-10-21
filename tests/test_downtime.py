@@ -30,15 +30,12 @@ async def machine_with_takings(session: AsyncSession, **fields: object) -> Machi
     return machine
 
 
-async def test_broken_machine_costs_its_usual_takings_per_day(session: AsyncSession) -> None:
+async def test_broken_machine_counts_days_since_it_broke(session: AsyncSession) -> None:
     machine = await machine_with_takings(session, broken_since=datetime(2026, 10, 10, 9, tzinfo=TZ))
     downtime = await DowntimeService(session, FixedClock(NOW)).for_machine(machine)
 
     assert downtime is not None and downtime.broken
     assert downtime.days == 11
-    # Average of working days only: (600 + 400) / 2.
-    assert downtime.daily_loss == Decimal(500)
-    assert downtime.lost == Decimal(5500)
 
 
 async def test_short_connection_loss_is_not_downtime(session: AsyncSession) -> None:

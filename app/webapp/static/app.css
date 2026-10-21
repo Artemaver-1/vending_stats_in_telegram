@@ -233,10 +233,6 @@ details summary::-webkit-details-marker { display: none; }
 .downtime .siren { font-size: 34px; animation: siren 0.8s steps(2, jump-none) infinite; }
 .downtime-title { font-size: 19px; font-weight: 800; line-height: 1.2; }
 .downtime-why { font-size: 13px; opacity: 0.85; margin-top: 2px; }
-.downtime-money { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.downtime-money div { background: rgb(255 255 255 / 16%); border-radius: 12px; padding: 8px 10px; }
-.downtime-money span { display: block; font-size: 12px; opacity: 0.85; }
-.downtime-money b { font-size: 20px; }
 .downtime-call { margin-top: 10px; font-weight: 700; }
 @keyframes downtime-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgb(229 72 77 / 55%); }
