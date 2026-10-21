@@ -37,7 +37,7 @@
 <h2>Аппараты</h2>
 <div class="list">
   {% for m in machines %}
-    <a class="item" hx-get="/app/admin/machines">
+    <a class="item" hx-get="/app/machines/{{ m.machine.id }}">
       <span class="icon">{{ "🚨" if m.machine.is_broken else ("🟢" if m.machine.is_online else "🔴") }}</span>
       <span class="grow">
         <div class="title">{{ m.machine.name }}</div>

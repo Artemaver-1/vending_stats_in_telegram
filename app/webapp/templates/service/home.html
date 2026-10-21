@@ -13,18 +13,24 @@
 </div>
 
 <h2>Силомеры</h2>
-<p class="hint" style="margin: -2px 8px 10px">Приехал к силомеру — выбери его и заполни отчёт</p>
+<p class="hint" style="margin: -2px 8px 10px">Приехал к силомеру — заполни отчёт. Нажми на силомер, чтобы посмотреть связь и выручку.</p>
 {% for m in machines %}
   <div class="card {{ 'alert' if m.machine.is_broken }}">
-    <div class="row between">
+    <a class="row between" style="color:inherit" hx-get="/app/machines/{{ m.machine.id }}">
       <div>
-        <div style="font-weight:700; font-size:17px">{{ m.machine.name }}</div>
+        <div style="font-weight:700; font-size:17px">
+          {{ "🚨" if m.machine.is_broken else ("🟢" if m.machine.is_online else "🔴") }} {{ m.machine.name }}
+        </div>
         <div class="hint">
-          {% if m.machine.is_broken %}🚨 не работает{% else %}последний отчёт: {{ when(m.last_report) if m.last_report else "не было" }}{% endif %}
+          {% if m.machine.is_broken %}не работает{% else %}последний отчёт: {{ when(m.last_report) if m.last_report else "не было" }}{% endif %}
         </div>
       </div>
-      {% if m.next_due %}<span class="chip {{ 'red' if m.next_due < today else ('amber' if m.next_due == today else 'grey') }}">проверка {{ when(m.next_due) }}</span>{% endif %}
-    </div>
+      <div class="right">
+        <div style="font-weight:700">{{ m.revenue.last_30_days | rub }}</div>
+        <div class="hint">за 30 дней ›</div>
+      </div>
+    </a>
+    {% if m.next_due %}<div style="margin-top:8px"><span class="chip {{ 'red' if m.next_due < today else ('amber' if m.next_due == today else 'grey') }}">проверка {{ when(m.next_due) }}</span></div>{% endif %}
     <button class="btn {{ '' if m.machine.is_broken or (m.next_due and m.next_due <= today) else 'secondary' }}" style="margin-top:12px"
             hx-get="/app/service/machines/{{ m.machine.id }}/report">📝 Новый отчёт</button>
   </div>

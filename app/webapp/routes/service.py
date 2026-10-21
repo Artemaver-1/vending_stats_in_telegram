@@ -14,6 +14,7 @@ from app.services.notifications import Messages
 from app.services.tasks import TaskError
 from app.webapp.auth import CurrentUser
 from app.webapp.deps import NotifierDep, TasksDep, UsersDep
+from app.webapp.routes.machines import MachineRevenue, machine_revenue
 from app.webapp.templating import render, with_toast
 
 router = APIRouter(prefix="/app/service")
@@ -24,6 +25,7 @@ class MachineCard:
     machine: Machine
     last_report: date | None
     next_due: date | None
+    revenue: MachineRevenue
 
 
 async def _task_or_404(tasks: TasksDep, task_id: int) -> Task:
@@ -53,7 +55,8 @@ async def home(
         last_day = None
         if last is not None and last.completed_at is not None:
             last_day = last.completed_at.astimezone(clock.tz).date()
-        cards.append(MachineCard(machine, last_day, next_due.get(machine.id)))
+        revenue = await machine_revenue(session, machine, clock.today())
+        cards.append(MachineCard(machine, last_day, next_due.get(machine.id), revenue))
 
     # Weekly checks live on the machine cards, so the task list holds only one-off tasks.
     listed = [t for t in open_tasks if t.kind is TaskKind.CUSTOM]

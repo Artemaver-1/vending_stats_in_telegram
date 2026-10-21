@@ -7,7 +7,7 @@
   {% set machine = m.machine %}
   <div class="card {{ 'alert' if machine.is_broken }}">
     <div class="row between">
-      <b style="font-size:17px">{{ machine.name }}</b>
+      <a hx-get="/app/machines/{{ machine.id }}" style="font-size:17px; font-weight:700; color:inherit">{{ machine.name }} ›</a>
       {% if machine.is_broken %}<span class="chip red">сломан</span>
       {% elif machine.is_online %}<span class="chip green">на связи</span>
       {% elif machine.is_online is none %}<span class="chip grey">нет данных</span>

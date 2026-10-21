@@ -1,6 +1,6 @@
 import re
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 import httpx
@@ -12,8 +12,8 @@ from sqlalchemy import select
 from app.api.main import create_app
 from app.config import Settings
 from app.db import Database
-from app.db.models import Location, Machine, Task, User
-from app.domain.enums import TaskKind, UserRole
+from app.db.models import DailyRevenue, Location, Machine, Task, User
+from app.domain.enums import PaymentChannel, RevenueSource, TaskKind, UserRole
 from app.domain.inspection import CHECKLIST
 from tests.helpers import BOT_TOKEN, TZ, FakeNotifier, FixedClock, make_init_data
 
@@ -295,3 +295,37 @@ async def test_service_accounts_share_one_screen(
     # Whoever closed it, the other account sees the same result.
     after = await client.get("/app/service", headers=as_user(WORKER_TG))
     assert "Недавно сделано" in after.text and "Второй" in after.text
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["", "?view=weeks", "?view=year", "?view=year&year=2025", "?view=month&year=2026&month=9"],
+)
+async def test_machine_screen_is_open_to_the_service_team(
+    client: httpx.AsyncClient, query: str
+) -> None:
+    response = await client.get(f"/app/machines/1{query}", headers=as_user(WORKER_TG))
+    assert response.status_code == 200, response.text
+    assert "Выручка за 30 дней" in response.text
+    # Revenue is fine to show; profit and rent stay in the admin panel.
+    assert "прибыль" not in response.text.lower()
+    assert "аренд" not in response.text.lower()
+
+
+async def test_worker_home_shows_takings_per_machine(
+    client: httpx.AsyncClient, db: Database
+) -> None:
+    async with db.session() as session:
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        session.add(
+            DailyRevenue(
+                machine_id=machine.id,
+                day=date(2026, 10, 15),
+                channel=PaymentChannel.COIN,
+                amount=Decimal("740"),
+                source=RevenueSource.TELEMETRY,
+            )
+        )
+    home = await client.get("/app/service", headers=as_user(WORKER_TG))
+    assert "740 ₽" in home.text and "/app/machines/" in home.text

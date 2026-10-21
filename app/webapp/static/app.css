@@ -207,3 +207,18 @@ details summary::-webkit-details-marker { display: none; }
 .statement .share { font-style: normal; color: var(--hint); font-size: 12px; margin-left: 6px; display: inline-block; min-width: 34px; text-align: right; }
 .statement .total { border-top: 2px solid var(--text); margin-top: 10px; padding-top: 12px; font-size: 17px; font-weight: 700; }
 .tabbar a { font-size: 10px; }
+
+.weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; max-width: 230px; margin-top: 8px; }
+.weekdays span { text-align: center; font-size: 10px; color: var(--hint); }
+.months { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.month {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 4px; border-radius: 10px; background: var(--line); color: var(--text);
+}
+.month span { font-size: 12px; color: inherit; opacity: 0.8; }
+.month b { font-size: 14px; }
+.month.full { background: color-mix(in srgb, var(--ok) 80%, transparent); color: #fff; }
+.month.most { background: color-mix(in srgb, var(--ok) 45%, var(--warn)); color: #fff; }
+.month.some { background: var(--warn); color: #fff; }
+.month.off { background: var(--danger); color: #fff; }
+.month.none { color: var(--hint); }

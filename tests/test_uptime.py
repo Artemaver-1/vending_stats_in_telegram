@@ -2,6 +2,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.uptime import Transition, daily_uptime
 
@@ -60,3 +61,26 @@ def test_duplicate_events_do_not_break_intervals() -> None:
     ]
     uptime = daily_uptime(transitions, date(2026, 10, 10), date(2026, 10, 10), tz=TZ, now=at(11, 0))
     assert uptime[date(2026, 10, 10)] == pytest.approx(0.5)
+
+
+async def test_days_before_telemetry_are_unknown(session: AsyncSession) -> None:
+    from decimal import Decimal
+
+    from app.db.models import ConnectionEvent, Machine
+    from app.services.uptime import UptimeService
+    from tests.helpers import FixedClock
+
+    machine = Machine(name="Динамо", purchase_cost=Decimal(1), launched_on=date(2024, 7, 1))
+    session.add(machine)
+    await session.flush()
+    session.add(
+        ConnectionEvent(id="e1", machine_id=machine.id, occurred_at=at(10, 12), online=False)
+    )
+    await session.flush()
+
+    service = UptimeService(session, FixedClock(at(20, 12)))
+    months = await service.monthly(machine, 2026)
+    # Nothing is known before the first SmartVend event in October.
+    assert all(months[date(2026, m, 1)] is None for m in range(1, 10))
+    assert months[date(2026, 10, 1)] is not None
+    assert months[date(2026, 12, 1)] is None

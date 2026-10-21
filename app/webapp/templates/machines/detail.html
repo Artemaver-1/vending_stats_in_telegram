@@ -1,0 +1,74 @@
+{% from "components.html" import uptime_grid, check_results with context %}
+{% set base = "/app/machines/%d" % machine.id %}
+<div data-back="{{ back }}"></div>
+<h1>{{ machine.name }}</h1>
+<p class="subtitle">
+  {% if machine.is_broken %}🚨 не работает
+  {% elif machine.is_online %}🟢 на связи
+  {% elif machine.is_online is none %}⚪ связь неизвестна
+  {% else %}🔴 нет связи{% endif %}
+  {% if machine.status_checked_at %} · проверено {{ machine.status_checked_at.astimezone(tz).strftime("%H:%M %d.%m") }}{% endif %}
+</p>
+
+<div class="kpis">
+  <div class="kpi">
+    <div class="label">Выручка за 30 дней</div>
+    <div class="value">{{ revenue.last_30_days | rub }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">С 1 {{ today | month_short }}</div>
+    <div class="value">{{ revenue.this_month | rub }}</div>
+  </div>
+</div>
+
+<h2>Связь</h2>
+<div class="segmented">
+  <a hx-get="{{ base }}?view=weeks" class="{{ 'active' if view == 'weeks' }}">4 недели</a>
+  <a hx-get="{{ base }}?view=year&year={{ year }}" class="{{ 'active' if view == 'year' }}">Год</a>
+  <a hx-get="{{ base }}?view=month" class="{{ 'active' if view == 'month' }}">Месяц</a>
+</div>
+
+<div class="card">
+  {% if view == "year" %}
+    <div class="row between" style="margin-bottom:10px">
+      {% if year > years[0] %}<button class="btn small secondary" hx-get="{{ base }}?view=year&year={{ year - 1 }}">‹ {{ year - 1 }}</button>{% else %}<span></span>{% endif %}
+      <b>{{ year }}</b>
+      {% if year < years[-1] %}<button class="btn small secondary" hx-get="{{ base }}?view=year&year={{ year + 1 }}">{{ year + 1 }} ›</button>{% else %}<span></span>{% endif %}
+    </div>
+    <div class="months">
+      {% for month, share in months.items() %}
+        <a class="month {{ share | uptime_level }}" hx-get="{{ base }}?view=month&year={{ month.year }}&month={{ month.month }}">
+          <span>{{ month | month_short }}</span>
+          <b>{{ share | percent if share is not none else "—" }}</b>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% if view == "month" %}
+      <div class="row between" style="margin-bottom:4px">
+        <button class="btn small secondary" hx-get="{{ base }}?view=month&year={{ prev_month.year }}&month={{ prev_month.month }}">‹ {{ prev_month | month_short }}</button>
+        <b>{{ shown | month_title }}</b>
+        {% if next_month %}<button class="btn small secondary" hx-get="{{ base }}?view=month&year={{ next_month.year }}&month={{ next_month.month }}">{{ next_month | month_short }} ›</button>{% else %}<span style="width:64px"></span>{% endif %}
+      </div>
+    {% endif %}
+    <div class="weekdays">{% for d in ["пн", "вт", "ср", "чт", "пт", "сб", "вс"] %}<span>{{ d }}</span>{% endfor %}</div>
+    {{ uptime_grid(days) }}
+  {% endif %}
+  <div class="row between" style="margin-top:12px">
+    <span class="hint">В среднем на связи</span>
+    <b>{{ average | percent if average is not none else "нет данных" }}</b>
+  </div>
+</div>
+<div class="legend" style="margin:0 6px">
+  <span><i style="background:var(--ok)"></i>весь день</span><span><i style="background:var(--warn)"></i>с перебоями</span><span><i style="background:var(--danger)"></i>офлайн</span><span><i style="background:var(--line)"></i>нет данных</span>
+</div>
+
+<h2>Последний отчёт</h2>
+<div class="card">
+  {% if last_report %}
+    <div class="hint">{{ last_report.completed_at.astimezone(tz).strftime("%d.%m.%Y %H:%M") }}{% if last_report.completed_by %} · {{ last_report.completed_by.name }}{% endif %}</div>
+    {{ check_results(last_report) }}
+    {% if last_report.comment %}<p style="margin:8px 0 0; white-space:pre-wrap">💬 {{ last_report.comment }}</p>{% endif %}
+  {% else %}<span class="hint">Отчётов ещё не было</span>{% endif %}
+</div>
+<button class="btn" hx-get="/app/service/machines/{{ machine.id }}/report">📝 Новый отчёт</button>
