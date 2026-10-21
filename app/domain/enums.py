@@ -19,12 +19,15 @@ class RentType(StrEnum):
 
 
 class ExpenseCategory(StrEnum):
+    RENT = "rent"
     PARTS = "parts"
     REPAIR = "repair"
-    ACQUIRING_FEE = "acquiring_fee"
     CONNECTIVITY = "connectivity"
-    TRANSPORT = "transport"
+    SMARTVEND = "smartvend"
+    STAFF = "staff"
     OTHER = "other"
+    TAXES = "taxes"
+    INSURANCE = "insurance"
 
 
 class MilestoneKind(StrEnum):

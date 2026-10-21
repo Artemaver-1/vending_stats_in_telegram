@@ -17,10 +17,10 @@
       <tr><td class="muted">{{ label }}</td><td class="right">{{ pnl.revenue.get(channel, 0) | rub }}</td></tr>
     {% endfor %}
     <tr><td><b>Выручка</b></td><td class="right"><b>{{ pnl.total_revenue | rub }}</b></td></tr>
-    <tr><td class="muted">Аренда</td><td class="right">{{ ("−" ~ (pnl.rent | rub)) if pnl.rent else "нет договоров" }}</td></tr>
     {% for category, amount in pnl.expenses.items() %}
       <tr><td class="muted">{{ EXPENSE_LABELS[category] }}</td><td class="right">−{{ amount | rub }}</td></tr>
     {% endfor %}
+    {% if not pnl.expenses %}<tr><td class="muted">Расходы</td><td class="right muted">нет</td></tr>{% endif %}
     <tr><td><b>Чистая прибыль</b></td><td class="right"><b class="{{ 'danger' if pnl.net_profit < 0 else 'ok' }}">{{ pnl.net_profit | rub }}</b></td></tr>
   </table>
 </div>
@@ -54,6 +54,8 @@
   <div class="kpi"><div class="label">Чистая прибыль</div><div class="value {{ 'neg' if totals.profit < 0 }}">{{ totals.profit | rub }}</div></div>
   <div class="kpi"><div class="label">Вложено</div><div class="value">{{ totals.investment | rub }}</div></div>
 </div>
+
+<a class="btn secondary" hx-get="/app/admin/ofr" style="margin:14px 0 0">📊 Подробный ОФР за любой период</a>
 
 <h2>Расходы</h2>
 <details class="card" {{ "open" if not expenses }}>

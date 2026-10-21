@@ -17,18 +17,21 @@ MONTHS_SHORT = (
 WEEKDAYS = ("пн", "вт", "ср", "чт", "пт", "сб", "вс")
 
 CHANNEL_LABELS = {
-    PaymentChannel.CARD: "Карты",
     PaymentChannel.COIN: "Монеты",
     PaymentChannel.BILL: "Купюры",
+    PaymentChannel.CARD: "Безнал",
 }
 
 EXPENSE_LABELS = {
+    ExpenseCategory.RENT: "Аренда",
     ExpenseCategory.PARTS: "Комплектующие",
     ExpenseCategory.REPAIR: "Ремонт",
-    ExpenseCategory.ACQUIRING_FEE: "Эквайринг",
-    ExpenseCategory.CONNECTIVITY: "Связь",
-    ExpenseCategory.TRANSPORT: "Транспорт",
+    ExpenseCategory.CONNECTIVITY: "Плата за симкарты",
+    ExpenseCategory.SMARTVEND: "Плата за SmartVend",
+    ExpenseCategory.STAFF: "Работник",
     ExpenseCategory.OTHER: "Прочее",
+    ExpenseCategory.TAXES: "Налоги",
+    ExpenseCategory.INSURANCE: "Страховые взносы",
 }
 
 

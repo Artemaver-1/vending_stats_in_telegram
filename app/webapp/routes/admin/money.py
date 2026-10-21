@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import ClockDep, SessionDep
 from app.db.models import Expense, Machine
 from app.domain.enums import ExpenseCategory
-from app.domain.finance import ZERO, MonthlyPnL
+from app.domain.finance import ZERO, IncomeStatement
 from app.domain.periods import month_start, next_month, previous_month
 from app.formatting import MONTHS_SHORT
 from app.repositories import ExpenseRepository, MachineRepository
@@ -59,7 +59,7 @@ async def economics(
     machines = await MachineRepository(session).list()
 
     launches = [m.launched_on for m in machines if m.launched_on]
-    history: list[MonthlyPnL] = []
+    history: list[IncomeStatement] = []
     if launches:
         history = await finance.pnl_range(min(launches), today)
     by_period = {p.period: p for p in history}

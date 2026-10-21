@@ -196,3 +196,13 @@ details summary::-webkit-details-marker { display: none; }
 .refresh .busy { display: none; }
 .refresh.htmx-request .idle { display: none; }
 .refresh.htmx-request .busy { display: inline; }
+
+.statement .line { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; }
+.statement .head { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 11px; font-weight: 600; }
+.statement .head:first-child { border-top: 0; margin-top: 0; padding-top: 4px; }
+.statement .sub { padding: 4px 0 4px 14px; color: var(--hint); font-size: 14px; }
+.statement .sub span:last-child { color: var(--text); }
+.statement .sub.zero span:last-child { color: var(--hint); }
+.statement .share { font-style: normal; color: var(--hint); font-size: 12px; margin-left: 6px; display: inline-block; min-width: 34px; text-align: right; }
+.statement .total { border-top: 2px solid var(--text); margin-top: 10px; padding-top: 12px; font-size: 17px; font-weight: 700; }
+.tabbar a { font-size: 10px; }

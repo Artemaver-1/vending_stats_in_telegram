@@ -29,20 +29,61 @@ class RentTerms:
         return to_money(revenue * self.revenue_percent / 100)
 
 
+# Lines of the income statement between revenue and taxes, in display order.
+COST_OF_SALES = (
+    ExpenseCategory.RENT,
+    ExpenseCategory.PARTS,
+    ExpenseCategory.REPAIR,
+    ExpenseCategory.CONNECTIVITY,
+    ExpenseCategory.SMARTVEND,
+    ExpenseCategory.STAFF,
+    ExpenseCategory.OTHER,
+)
+
+
 @dataclass(slots=True)
-class MonthlyPnL:
-    period: date
+class IncomeStatement:
+    """Revenue and expenses for the days from `start` to `end`, both inclusive.
+
+    `expenses[RENT]` holds rent from contracts plus any rent entered by hand.
+    """
+
+    start: date
+    end: date
     revenue: dict[PaymentChannel, Decimal] = field(default_factory=dict)
     expenses: dict[ExpenseCategory, Decimal] = field(default_factory=dict)
-    rent: Decimal = ZERO
+
+    @property
+    def period(self) -> date:
+        return self.start
 
     @property
     def total_revenue(self) -> Decimal:
         return sum(self.revenue.values(), ZERO)
 
+    def revenue_share(self, channel: PaymentChannel) -> float:
+        total = self.total_revenue
+        return float(self.revenue.get(channel, ZERO) / total) if total else 0.0
+
+    @property
+    def rent(self) -> Decimal:
+        return self.expenses.get(ExpenseCategory.RENT, ZERO)
+
+    @property
+    def cost_of_sales(self) -> Decimal:
+        return sum((self.expenses.get(c, ZERO) for c in COST_OF_SALES), ZERO)
+
+    @property
+    def taxes(self) -> Decimal:
+        return self.expenses.get(ExpenseCategory.TAXES, ZERO)
+
+    @property
+    def insurance(self) -> Decimal:
+        return self.expenses.get(ExpenseCategory.INSURANCE, ZERO)
+
     @property
     def total_expenses(self) -> Decimal:
-        return sum(self.expenses.values(), ZERO) + self.rent
+        return sum(self.expenses.values(), ZERO)
 
     @property
     def net_profit(self) -> Decimal:
@@ -66,7 +107,7 @@ class PaybackStatus:
         return min(float(self.earned / self.investment), 1.0)
 
 
-def calculate_payback(months: Iterable[MonthlyPnL], investment: Decimal) -> PaybackStatus:
+def calculate_payback(months: Iterable[IncomeStatement], investment: Decimal) -> PaybackStatus:
     """Walks months in chronological order and finds the one where cumulative profit
     first covers the initial investment."""
     earned = ZERO

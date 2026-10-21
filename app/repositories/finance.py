@@ -26,8 +26,11 @@ class RevenueRepository(Repository[DailyRevenue]):
         rows = await self.session.execute(stmt)
         return {channel: Decimal(total) for channel, total in rows}
 
-    async def first_day(self) -> date | None:
-        return await self.session.scalar(select(func.min(DailyRevenue.day)))
+    async def first_day(self, machine_ids: Collection[int] | None = None) -> date | None:
+        stmt = select(func.min(DailyRevenue.day))
+        if machine_ids is not None:
+            stmt = stmt.where(DailyRevenue.machine_id.in_(machine_ids))
+        return await self.session.scalar(stmt)
 
 
 class ExpenseRepository(Repository[Expense]):
@@ -54,6 +57,15 @@ class ExpenseRepository(Repository[Expense]):
                 else machine_filter
             )
         rows = await self.session.execute(stmt)
+        return {category: Decimal(total) for category, total in rows}
+
+    async def shared_totals(self, start: date, end: date) -> dict[ExpenseCategory, Decimal]:
+        """Expenses in [start, end) that aren't tied to any machine."""
+        rows = await self.session.execute(
+            select(Expense.category, func.sum(Expense.amount))
+            .where(Expense.spent_on >= start, Expense.spent_on < end, Expense.machine_id.is_(None))
+            .group_by(Expense.category)
+        )
         return {category: Decimal(total) for category, total in rows}
 
     async def recent(self, limit: int = 10) -> Sequence[Expense]:

@@ -173,6 +173,9 @@ async def test_admin_creates_task_with_qr_for_worker(
         "/app/admin/tasks?view=done",
         "/app/admin/tasks/new",
         "/app/admin/reports",
+        "/app/admin/ofr",
+        "/app/admin/ofr?all_time=true",
+        "/app/admin/ofr?start=2026-09-01&end=2026-09-30&machine=1",
         "/app/admin/economics",
         "/app/admin/economics?month=2026-09",
         "/app/admin/rent",
@@ -225,3 +228,30 @@ async def test_admin_lets_new_person_in(
     assert response.status_code == 200
     assert (await client.get("/app/service", headers=as_user(STRANGER_TG))).status_code == 200
     assert notifier(app).sent[0][0] == [STRANGER_TG]
+
+
+async def test_income_statement_shows_taxes_and_shares(client: httpx.AsyncClient) -> None:
+    for category, amount in (("taxes", "600"), ("insurance", "300"), ("connectivity", "250")):
+        response = await client.post(
+            "/app/admin/expenses",
+            data={"amount": amount, "spent_on": "2026-10-10", "category": category},
+            headers=as_user(ADMIN_TG),
+        )
+        assert response.status_code == 200
+
+    page = await client.get(
+        "/app/admin/ofr?start=2026-10-01&end=2026-10-21", headers=as_user(ADMIN_TG)
+    )
+    text = page.text
+    for line in (
+        "Выручка",
+        "Себестоимость",
+        "Плата за симкарты",
+        "Плата за SmartVend",
+        "Работник",
+        "Налоги",
+        "Страховые взносы",
+        "Чистая прибыль",
+    ):
+        assert line in text
+    assert "−1 150 ₽" in text  # nothing earned, everything spent

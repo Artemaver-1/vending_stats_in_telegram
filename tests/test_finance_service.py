@@ -63,7 +63,7 @@ async def business(session: AsyncSession) -> dict[str, Machine]:
                 spent_on=date(2026, 9, 12),
             ),
             Expense(
-                category=ExpenseCategory.TRANSPORT,
+                category=ExpenseCategory.CONNECTIVITY,
                 amount=Decimal("1500"),
                 spent_on=date(2026, 9, 20),
             ),
@@ -93,16 +93,40 @@ async def test_business_month(session: AsyncSession, business: dict[str, Machine
     assert pnl.net_profit == Decimal("60500")
 
 
-async def test_machine_month_skips_shared_expenses(
+async def test_machine_month_gets_a_share_of_common_expenses(
     session: AsyncSession, business: dict[str, Machine]
 ) -> None:
     service = FinanceService(session)
     pnl = await service.monthly_pnl(date(2026, 9, 1), business["garden"].id)
 
     assert pnl.total_revenue == Decimal("60000")
-    assert pnl.rent == Decimal("12000")
-    assert pnl.expenses == {ExpenseCategory.REPAIR: Decimal("4000")}
-    assert pnl.net_profit == Decimal("44000")
+    assert pnl.expenses == {
+        ExpenseCategory.RENT: Decimal("12000.00"),
+        ExpenseCategory.REPAIR: Decimal("4000"),
+        # 1 500 for SIM cards isn't tied to a machine: half of it lands here
+        ExpenseCategory.CONNECTIVITY: Decimal("750.00"),
+    }
+    assert pnl.net_profit == Decimal("43250.00")
+
+
+async def test_statement_for_part_of_a_month(
+    session: AsyncSession, business: dict[str, Machine]
+) -> None:
+    statement = await FinanceService(session).statement(date(2026, 9, 1), date(2026, 9, 5))
+
+    # Only the card sales of the 5th; coins were taken on the 6th.
+    assert statement.total_revenue == Decimal("80000")
+    # Fixed 12 000 for 5 of 30 days, plus 20% of the garden's 50 000.
+    assert statement.rent == Decimal("2000.00") + Decimal("10000.00")
+    assert statement.cost_of_sales == statement.rent
+
+
+async def test_all_time_starts_at_first_launch(
+    session: AsyncSession, business: dict[str, Machine]
+) -> None:
+    service = FinanceService(session)
+    assert await service.first_day() == date(2026, 6, 10)
+    assert await service.first_day(business["dynamo"].id) == date(2026, 7, 1)
 
 
 async def test_empty_month_still_charges_fixed_rent(
@@ -120,7 +144,8 @@ async def test_payback_counts_from_launch(
         business["dynamo"].id, today=date(2026, 9, 30)
     )
     # July and August: rent only; September: 30 000 revenue minus 12 000 rent
-    assert status.earned == Decimal("-6000")
+    # and half of the common 1 500 expense.
+    assert status.earned == Decimal("-6750.00")
     assert status.reached_in is None
 
 

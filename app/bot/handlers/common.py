@@ -1,46 +1,71 @@
+from pathlib import Path
+
 from aiogram import Router
-from aiogram.filters import Command, CommandStart
-from aiogram.types import InlineKeyboardMarkup, Message, WebAppInfo
+from aiogram.filters import CommandStart
+from aiogram.types import FSInputFile, InlineKeyboardMarkup, Message, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.bot.webapp_link import WebAppLink, button_text
+from app.bot.webapp_link import WebAppLink
 from app.db.models import User
 
 router = Router(name="common")
+
+WELCOME_PICTURE = Path(__file__).parent.parent / "assets" / "welcome.jpg"
+
+ADMIN_WELCOME = (
+    "<b>силомеры.рф</b> — панель управления\n\n"
+    "Задачи, статистика, оплата аренды и прибыль — всё в приложении 👇"
+)
+SERVICE_WELCOME = "<b>Обслуживание силомеров</b>\n\nВаши задачи и отчёты — в приложении 👇"
+
+
+class WelcomePicture:
+    """Uploads the picture once and reuses Telegram's file_id afterwards."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.file_id: str | None = None
+
+    def input(self) -> str | FSInputFile:
+        return self.file_id or FSInputFile(self.path)
+
+    def remember(self, message: Message) -> None:
+        if message.photo:
+            self.file_id = message.photo[-1].file_id
+
+
+welcome_picture = WelcomePicture(WELCOME_PICTURE)
 
 
 def open_app_keyboard(link: WebAppLink, user: User) -> InlineKeyboardMarkup | None:
     if link.url is None:
         return None
     builder = InlineKeyboardBuilder()
-    builder.button(text=f"📱 {button_text(user)}", web_app=WebAppInfo(url=link.url))
+    builder.button(text="📱 Открыть приложение", web_app=WebAppInfo(url=link.url))
     return builder.as_markup()
 
 
 @router.message(CommandStart())
-@router.message(Command("app"))
 async def start(message: Message, user: User, webapp: WebAppLink) -> None:
     if message.bot is not None:
         await webapp.apply(message.bot, [user])
     keyboard = open_app_keyboard(webapp, user)
     if keyboard is None:
-        await message.answer("Приложение запускается, попробуйте через минуту: /app")
+        await message.answer("Приложение запускается, отправьте /start через минуту.")
         return
+
     if user.is_admin:
-        text = "Панель управления силомерами — финансы, задачи, аренда и аппараты."
+        sent = await message.answer_photo(
+            welcome_picture.input(), caption=ADMIN_WELCOME, reply_markup=keyboard
+        )
+        welcome_picture.remember(sent)
     else:
-        text = "Обслуживание силомеров: здесь ваши задачи и проверки."
-    await message.answer(f"{text}\nОткройте приложение кнопкой ниже 👇", reply_markup=keyboard)
-
-
-@router.message(Command("id"))
-async def show_id(message: Message) -> None:
-    if message.from_user is not None:
-        await message.answer(f"Ваш Telegram ID: <code>{message.from_user.id}</code>")
+        await message.answer(SERVICE_WELCOME, reply_markup=keyboard)
 
 
 @router.message()
-async def fallback(message: Message, user: User, webapp: WebAppLink) -> None:
+async def everything_else(message: Message, user: User, webapp: WebAppLink) -> None:
+    # The chat itself has no features: anything typed just points back to the Mini App.
     await message.answer(
         "Всё делается в приложении 👇", reply_markup=open_app_keyboard(webapp, user)
     )

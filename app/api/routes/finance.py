@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.api.deps import ClockDep, SessionDep
 from app.domain.enums import ExpenseCategory, PaymentChannel
-from app.domain.finance import MonthlyPnL, PaybackStatus
+from app.domain.finance import IncomeStatement, PaybackStatus
 from app.services.finance import FinanceService, MachineNotFoundError
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -23,7 +23,7 @@ class PnlOut(BaseModel):
     net_profit: Decimal
 
     @classmethod
-    def from_domain(cls, pnl: MonthlyPnL) -> "PnlOut":
+    def from_domain(cls, pnl: IncomeStatement) -> "PnlOut":
         return cls(
             period=pnl.period,
             revenue=pnl.revenue,

@@ -35,7 +35,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["webapp/templates/**/*.html", "webapp/static/*"]
+app = ["webapp/templates/**/*.html", "webapp/static/*", "bot/assets/*"]
 
 [tool.ruff]
 line-length = 100

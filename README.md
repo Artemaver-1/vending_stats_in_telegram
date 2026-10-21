@@ -9,7 +9,8 @@ task list with weekly inspection checklists.
 
 - **Admin** — dashboard with a button to pull fresh SmartVend data, tasks for the crew
   (with a QR code or file attached), "Инфа от работника" — every report the crew files,
-  economics per month and per machine, rent contracts with accruals and payment marks,
+  an income statement (ОФР) for any period and any machine, economics per month,
+  rent contracts with accruals and payment marks,
   machine status and uptime, team access.
 - **Service** — "Обслуживание силомеров": one-off tasks from the admin and the list of
   machines. On site the worker opens a machine, sees its state after the previous visit
@@ -98,12 +99,21 @@ docker compose exec db createdb -U vending vending_test
 .venv/bin/ruff check . && .venv/bin/mypy app
 ```
 
+The bot chat has no commands or menus: `/start` shows a welcome card with a button that
+opens the Mini App, and the chat otherwise only carries notifications.
+
 ## How profit is calculated
 
+The income statement runs top to bottom: revenue by payment channel with its share,
+cost of sales (rent, parts, repair, SIM cards, SmartVend fee, staff, other), taxes,
+insurance contributions, net profit.
+
 - Rent comes from contract terms (fixed amount or a percentage of the location's revenue),
-  so a month's profit is correct before the rent for it is actually paid.
+  so a period's profit is correct before the rent for it is actually paid. A fixed rent is
+  prorated by days when a period covers part of a month; a percentage rent applies to the
+  revenue of exactly those days. Rent entered by hand as an expense is added on top.
 - In a per-machine report the location rent is split evenly between machines at that
-  location, and shared expenses that aren't tied to a machine are excluded.
+  location, and expenses that aren't tied to a machine are split between active machines.
 - Payback is the first month in which cumulative net profit since launch covers the
   purchase cost of the machine.
 - Card, coin and bill revenue all come from SmartVend; the Vendista card terminal export is

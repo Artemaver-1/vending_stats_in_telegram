@@ -1,0 +1,69 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+{% set s = statement %}
+{% set machine_q = "&machine=%d" % selected if selected else "" %}
+<h1>ОФР</h1>
+<p class="subtitle">Отчёт о финансовых результатах</p>
+
+<form class="card" hx-get="/app/admin/ofr" hx-trigger="change">
+  {% if selected %}<input type="hidden" name="machine" value="{{ selected }}">{% endif %}
+  <div class="two">
+    <label class="field" style="margin-bottom:10px"><span>С</span>
+      <input type="date" name="start" value="{{ s.start.isoformat() }}" max="{{ today.isoformat() }}">
+    </label>
+    <label class="field" style="margin-bottom:10px"><span>По</span>
+      <input type="date" name="end" value="{{ s.end.isoformat() }}" max="{{ today.isoformat() }}">
+    </label>
+  </div>
+  <div class="row" style="flex-wrap:wrap; gap:8px">
+    {% set this_start, this_end = presets.this_month %}
+    {% set last_start, last_end = presets.last_month %}
+    <button type="button" class="btn small {{ '' if (s.start, s.end) == (this_start, this_end) and not all_time else 'secondary' }}"
+            hx-get="/app/admin/ofr?start={{ this_start }}&end={{ this_end }}{{ machine_q }}">Этот месяц</button>
+    <button type="button" class="btn small {{ '' if (s.start, s.end) == (last_start, last_end) else 'secondary' }}"
+            hx-get="/app/admin/ofr?start={{ last_start }}&end={{ last_end }}{{ machine_q }}">Прошлый месяц</button>
+    <button type="button" class="btn small {{ '' if all_time else 'secondary' }}"
+            hx-get="/app/admin/ofr?all_time=true{{ machine_q }}">За всё время</button>
+  </div>
+</form>
+
+{% set period_q = "all_time=true" if all_time else "start=%s&end=%s" % (s.start, s.end) %}
+<div class="segmented">
+  <a hx-get="/app/admin/ofr?{{ period_q }}" class="{{ 'active' if not selected }}">Все</a>
+  {% for m in machines %}
+    <a hx-get="/app/admin/ofr?{{ period_q }}&machine={{ m.id }}" class="{{ 'active' if selected == m.id }}">{{ m.name }}</a>
+  {% endfor %}
+</div>
+
+<div class="card statement">
+  <div class="line head"><span>Выручка</span><b>{{ s.total_revenue | rub }}</b></div>
+  {% for channel, label in CHANNEL_LABELS.items() %}
+    <div class="line sub">
+      <span>{{ label }}</span>
+      <span>{{ s.revenue.get(channel, 0) | rub }} <i class="share">{{ s.revenue_share(channel) | percent }}</i></span>
+    </div>
+  {% endfor %}
+
+  <div class="line head"><span>Себестоимость</span><b>{{ ("−" ~ (s.cost_of_sales | rub)) if s.cost_of_sales else (0 | rub) }}</b></div>
+  {% for category in cost_lines %}
+    {% set amount = s.expenses.get(category, 0) %}
+    <div class="line sub {{ 'zero' if not amount }}"><span>{{ EXPENSE_LABELS[category] }}</span><span>{{ amount | rub }}</span></div>
+  {% endfor %}
+
+  <div class="line head"><span>Налоги</span><b>{{ s.taxes | rub }}</b></div>
+  <div class="line head"><span>Страховые взносы</span><b>{{ s.insurance | rub }}</b></div>
+
+  <div class="line total">
+    <span>Чистая прибыль</span>
+    <b class="{{ 'danger' if s.net_profit < 0 else 'ok' }}">{{ s.net_profit | rub }}</b>
+  </div>
+  {% if s.total_revenue %}
+    <div class="hint right">рентабельность {{ (s.net_profit / s.total_revenue) | float | percent }}</div>
+  {% endif %}
+</div>
+<p class="hint" style="margin:0 6px">
+  {{ s.start.strftime("%d.%m.%Y") }} — {{ s.end.strftime("%d.%m.%Y") }}.
+  Аренда считается по договорам и добавленным вручную расходам «Аренда».
+  {% if selected %}Общие расходы делятся поровну между силомерами.{% endif %}
+</p>
+{% endblock %}

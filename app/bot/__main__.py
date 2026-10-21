@@ -5,7 +5,6 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand
 
 from app.bot.handlers import build_router
 from app.bot.middlewares import AccessMiddleware, DatabaseMiddleware
@@ -17,7 +16,6 @@ from app.services.staff import UserService
 
 logger = logging.getLogger(__name__)
 
-COMMANDS = [BotCommand(command="app", description="Открыть приложение")]
 LINK_CHECK_SECONDS = 120
 
 
@@ -66,7 +64,8 @@ async def main() -> None:
 
     link_task = asyncio.create_task(keep_menu_buttons_fresh(bot, db, webapp))
     try:
-        await bot.set_my_commands(COMMANDS)
+        # No commands in the menu: the chat button opening the Mini App is the only control.
+        await bot.delete_my_commands()
         # Updates sent while the machine was off are kept by Telegram for 24 hours;
         # not dropping them means everything typed offline gets processed on startup.
         await bot.delete_webhook(drop_pending_updates=False)
