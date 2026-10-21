@@ -13,6 +13,7 @@ from app.domain.enums import TaskKind, UserRole
 from app.domain.inspection import CHECKLIST
 from app.repositories import MachineRepository
 from app.services.cash import CashError, EncashmentService
+from app.services.downtime import DowntimeService
 from app.services.notifications import Messages
 from app.services.tasks import TaskError
 from app.webapp.auth import CurrentUser
@@ -67,6 +68,7 @@ async def home(
     return render(
         request,
         "service/home.html",
+        downtimes=await DowntimeService(session, clock).all_down(),
         user=user,
         tasks=listed,
         machines=cards,

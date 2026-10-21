@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from app.api.deps import ClockDep, SessionDep
 from app.db.models import Machine
 from app.domain.periods import month_start, next_month, previous_month
+from app.services.downtime import DowntimeService
 from app.services.finance import FinanceService
 from app.services.uptime import UptimeService
 from app.webapp.auth import CurrentUser
@@ -84,6 +85,7 @@ async def machine_page(
         machine=machine,
         revenue=await machine_revenue(session, machine, today),
         reports=await tasks.reports(machine.id, limit=5),
+        downtime=await DowntimeService(session, clock).for_machine(machine),
         view=view,
         year=year,
         years=years,

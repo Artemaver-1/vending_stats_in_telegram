@@ -44,6 +44,8 @@ class Machine(TimestampMixin, Base):
 
     # Set when an inspection finds the whole machine down; cleared by a passing check.
     broken_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Last day the team got the daily "machine is standing idle" message.
+    down_alerted_on: Mapped[date | None]
 
     location: Mapped[Location | None] = relationship(back_populates="machines")
 

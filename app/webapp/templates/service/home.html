@@ -1,7 +1,8 @@
-{% from "components.html" import task_item with context %}
+{% from "components.html" import task_item, down_banner with context %}
 {% if back %}<div data-back="{{ back }}"></div>{% endif %}
 <h1>Обслуживание силомеров</h1>
 <p class="subtitle">{{ user.name }}, вот что нужно сделать</p>
+{% for d in downtimes %}{{ down_banner(d, report_button=true) }}{% endfor %}
 
 <h2>Задачи</h2>
 <div class="list">

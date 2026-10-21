@@ -10,7 +10,8 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BufferedInputFile
 
 from app.db.models import ConnectionEvent, Encashment, RentPayment, Task
-from app.formatting import human_date, month_title, rub
+from app.formatting import human_date, month_title, plural, rub
+from app.services.downtime import Downtime
 from app.services.tasks import InspectionOutcome
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,10 @@ class Photo:
 class Notifier(Protocol):
     async def send(
         self, chat_ids: Iterable[int], text: str, *, photo: Photo | None = None
+    ) -> None: ...
+
+    async def send_document(
+        self, chat_id: int, filename: str, data: bytes, caption: str
     ) -> None: ...
 
 
@@ -43,6 +48,10 @@ class TelegramNotifier:
             except TelegramAPIError:
                 # One blocked or deleted chat shouldn't stop alerts to everyone else.
                 logger.exception("Failed to notify %s", chat_id)
+
+    async def send_document(self, chat_id: int, filename: str, data: bytes, caption: str) -> None:
+        file = BufferedInputFile(data, filename=filename)
+        await self.bot.send_document(chat_id, file, caption=caption)
 
 
 class Messages:
@@ -157,4 +166,18 @@ class Messages:
         counted = encashment.counted
         if counted is not None and counted != deposited:
             lines.append(f"Посчитано было {rub(counted)}, разница {rub(counted - deposited)}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def downtime(downtime: Downtime) -> str:
+        name = escape(downtime.machine.name)
+        days = f"{downtime.days} {plural(downtime.days, 'день', 'дня', 'дней')}"
+        why = "сломан" if downtime.broken else "нет связи"
+        lines = [f"🚨🚨🚨 <b>«{name}» стоит уже {days}</b> ({why})"]
+        if downtime.daily_loss:
+            lines.append(
+                f"Упущено ≈ <b>{rub(downtime.lost)}</b>, каждый день простоя — "
+                f"минус {rub(downtime.daily_loss)}."
+            )
+        lines.append("Чините как можно скорее! Когда заработает — заполните отчёт по силомеру.")
         return "\n".join(lines)

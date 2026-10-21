@@ -86,3 +86,11 @@ def uptime_level(share: float | None) -> str:
     if share > 0:
         return "some"
     return "off"
+
+
+def plural(n: int, one: str, few: str, many: str) -> str:
+    """Russian noun form for a number: 1 день, 2 дня, 5 дней."""
+    n = abs(n) % 100
+    if 11 <= n <= 14:
+        return many
+    return {1: one, 2: few, 3: few, 4: few}.get(n % 10, many)

@@ -471,3 +471,34 @@ async def test_payout_and_cash_history(client: httpx.AsyncClient) -> None:
         headers=as_user(ADMIN_TG),
     )
     assert history.status_code == 200 and "9 300 ₽" in history.text
+
+
+async def test_broken_machine_is_loud_for_everyone(client: httpx.AsyncClient, db: Database) -> None:
+    async with db.session() as session:
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        machine.broken_since = datetime(2026, 10, 18, 9, tzinfo=TZ)
+    service = await client.get("/app/service", headers=as_user(WORKER_TG))
+    admin = await client.get("/app/admin", headers=as_user(ADMIN_TG))
+    for page in (service, admin):
+        assert "стоит 3 дня" in page.text and "Чините как можно скорее" in page.text
+    assert "Починил — заполнить отчёт" in service.text
+
+
+async def test_export_for_ai(app: FastAPI, client: httpx.AsyncClient) -> None:
+    import io
+    import zipfile
+
+    response = await client.post("/app/admin/export", headers=as_user(ADMIN_TG))
+    assert response.status_code == 200
+
+    ((chat_id, filename, data),) = notifier(app).documents
+    assert chat_id == ADMIN_TG and filename.endswith(".zip")
+    archive = zipfile.ZipFile(io.BytesIO(data))
+    names = set(archive.namelist())
+    assert {"machines.csv", "daily_revenue.csv", "monthly_summary.csv", "ПРОМТ_ДЛЯ_ИИ.txt"} <= names
+    assert "attachments.csv" not in names
+    users = archive.read("users.csv").decode()
+    assert str(ADMIN_TG) not in users and "telegram_id" not in users
+    # The prompt also arrives as a message ready to copy.
+    assert "аналитик" in notifier(app).sent[-1][1]

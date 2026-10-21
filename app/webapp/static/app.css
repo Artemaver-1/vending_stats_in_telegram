@@ -222,3 +222,26 @@ details summary::-webkit-details-marker { display: none; }
 .month.some { background: var(--warn); color: #fff; }
 .month.off { background: var(--danger); color: #fff; }
 .month.none { color: var(--hint); }
+
+/* Downtime banner: loud on purpose, an idle machine is money lost every hour. */
+.downtime {
+  background: linear-gradient(135deg, #e5484d, #b4232a); color: #fff;
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  animation: downtime-pulse 1.6s ease-in-out infinite;
+}
+.downtime-head { display: flex; gap: 12px; align-items: center; }
+.downtime .siren { font-size: 34px; animation: siren 0.8s steps(2, jump-none) infinite; }
+.downtime-title { font-size: 19px; font-weight: 800; line-height: 1.2; }
+.downtime-why { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+.downtime-money { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.downtime-money div { background: rgb(255 255 255 / 16%); border-radius: 12px; padding: 8px 10px; }
+.downtime-money span { display: block; font-size: 12px; opacity: 0.85; }
+.downtime-money b { font-size: 20px; }
+.downtime-call { margin-top: 10px; font-weight: 700; }
+@keyframes downtime-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(229 72 77 / 55%); }
+  50% { box-shadow: 0 0 0 8px rgb(229 72 77 / 0%); }
+}
+@keyframes siren { 0% { transform: rotate(-12deg); } 100% { transform: rotate(12deg); } }
+@media (prefers-reduced-motion: reduce) { .downtime, .downtime .siren { animation: none; } }
+

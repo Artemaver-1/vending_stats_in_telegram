@@ -11,6 +11,7 @@ from app.db import Database
 from app.domain.enums import UserRole
 from app.integrations.smartvend import SmartVendClient, SmartVendError
 from app.repositories.telemetry import SyncStateRepository
+from app.services.downtime import DowntimeService
 from app.services.notifications import Messages, Notifier
 from app.services.rent import RentService
 from app.services.staff import UserService
@@ -154,6 +155,12 @@ class ServiceJobs:
                 days_left = (task.due_on - today).days if task.due_on else 0
                 await self.notifier.send(workers, Messages.task_reminder(task, days_left))
                 task.reminded_on = today
+
+            # An idle machine gets a loud message every day until someone fixes it.
+            for downtime in await DowntimeService(session, self.clock).all_down():
+                if downtime.machine.down_alerted_on != today:
+                    await self.notifier.send(admins + workers, Messages.downtime(downtime))
+                    downtime.machine.down_alerted_on = today
 
             rent = RentService(session, self.clock)
             await rent.sync_accruals()

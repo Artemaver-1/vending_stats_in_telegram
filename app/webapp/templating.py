@@ -19,6 +19,7 @@ from app.formatting import (
     WEEKDAYS,
     human_date,
     month_title,
+    plural,
     rub,
     uptime_level,
 )
@@ -33,6 +34,7 @@ templates.env.filters.update(
     weekday=lambda d: WEEKDAYS[d.weekday()],
     uptime_level=uptime_level,
     percent=lambda v: f"{v:.0%}",
+    plural=plural,
 )
 templates.env.globals.update(
     CHECKLIST=CHECKLIST,

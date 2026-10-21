@@ -1,4 +1,4 @@
-{% from "components.html" import uptime_grid, check_results with context %}
+{% from "components.html" import uptime_grid, check_results, down_banner with context %}
 {% set base = "/app/machines/%d" % machine.id %}
 <div data-back="{{ back }}"></div>
 <h1>{{ machine.name }}</h1>
@@ -10,6 +10,7 @@
   {% if machine.status_checked_at %} · проверено {{ machine.status_checked_at.astimezone(tz).strftime("%H:%M %d.%m") }}{% endif %}
 </p>
 
+{% if downtime %}{{ down_banner(downtime, report_button=true) }}{% endif %}
 <div class="kpis">
   <div class="kpi">
     <div class="label">Выручка за 30 дней</div>

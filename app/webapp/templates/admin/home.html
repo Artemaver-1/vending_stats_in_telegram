@@ -1,5 +1,5 @@
 {% extends "admin/layout.html" %}
-{% from "components.html" import progress, task_item with context %}
+{% from "components.html" import progress, task_item, down_banner with context %}
 {% block content %}
 <div class="row between" style="align-items:flex-start">
   <div>
@@ -11,6 +11,7 @@
   </button>
 </div>
 {% if synced_at %}<p class="hint" style="margin:-8px 4px 12px">Данные SmartVend на {{ synced_at.astimezone(tz).strftime("%H:%M %d.%m") }}</p>{% endif %}
+{% for d in downtimes %}{{ down_banner(d) }}{% endfor %}
 {% for error in sync_errors %}
   <div class="card alert"><b>⚠️ SmartVend не обновляется</b><p class="hint" style="margin:4px 0 0">{{ error }}</p></div>
 {% endfor %}
@@ -85,5 +86,12 @@
   <a class="item" hx-get="/app/admin/machines"><span class="icon">📡</span><span class="grow title">Аппараты и связь</span><span class="chev"></span></a>
   <a class="item" hx-get="/app/admin/team"><span class="icon">👥</span><span class="grow title">Команда</span>{% if pending_users %}<span class="chip red">{{ pending_users }}</span>{% endif %}<span class="chev"></span></a>
   <a class="item" hx-get="/app/service"><span class="icon">🔧</span><span class="grow title">Открыть обслуживание</span><span class="chev"></span></a>
+  <button class="item refresh" hx-post="/app/admin/export" hx-disabled-elt="this">
+    <span class="icon">📦</span>
+    <span class="grow">
+      <div class="title"><span class="idle">Выгрузить все данные для ИИ</span><span class="busy">Собираю архив…</span></div>
+      <div class="meta">Архив CSV и готовый промт придут в чат с ботом</div>
+    </span>
+  </button>
 </div>
 {% endblock %}

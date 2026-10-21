@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from html import escape
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -11,9 +12,11 @@ from app.db.models import Machine, SyncState
 from app.domain.enums import TaskStatus
 from app.formatting import MONTHS_GENITIVE
 from app.repositories import MachineRepository
+from app.services.downtime import DowntimeService
+from app.services.export import AI_PROMPT, DataExporter
 from app.services.finance import FinanceService
 from app.webapp.auth import AdminUser
-from app.webapp.deps import RentDep, TasksDep, UsersDep
+from app.webapp.deps import NotifierDep, RentDep, TasksDep, UsersDep
 from app.webapp.routes.admin.common import admin_page
 from app.webapp.templating import with_toast
 from app.worker.jobs import TelemetryJobs
@@ -71,6 +74,7 @@ async def home(
         rent_due=rent_due,
         pending_users=pending_users,
         month_name=MONTHS_GENITIVE[today.month - 1],
+        downtimes=await DowntimeService(session, clock).all_down(),
         synced_at=max(checked) if checked else None,
         sync_errors=sorted(e for e in sync_errors if e),
         toast=toast,
@@ -99,3 +103,27 @@ async def refresh_smartvend(
     if failure:
         return with_toast(page, failure, error=True)
     return with_toast(page, "Данные SmartVend обновлены")
+
+
+@router.post("/app/admin/export", response_class=HTMLResponse)
+async def export_for_ai(
+    request: Request,
+    admin: AdminUser,
+    session: SessionDep,
+    clock: ClockDep,
+    tasks: TasksDep,
+    rent: RentDep,
+    users: UsersDep,
+    notifier: NotifierDep,
+) -> HTMLResponse:
+    filename, data = await DataExporter(session, clock).build()
+    await notifier.send_document(
+        admin.telegram_id,
+        filename,
+        data,
+        "📦 Все данные бизнеса. Загрузите архив в чат с ИИ и отправьте промт из следующего "
+        "сообщения (он же лежит в архиве).",
+    )
+    await notifier.send([admin.telegram_id], escape(AI_PROMPT))
+    page = await home(request, admin, session, clock, tasks, rent, users)
+    return with_toast(page, "Архив и промт отправлены в чат с ботом")

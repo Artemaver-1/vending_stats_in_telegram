@@ -42,6 +42,10 @@ def make_init_data(
 class FakeNotifier:
     def __init__(self) -> None:
         self.sent: list[tuple[list[int], str, bool]] = []
+        self.documents: list[tuple[int, str, bytes]] = []
 
     async def send(self, chat_ids: object, text: str, *, photo: object = None) -> None:
         self.sent.append((list(chat_ids), text, photo is not None))  # type: ignore[call-overload]
+
+    async def send_document(self, chat_id: int, filename: str, data: bytes, caption: str) -> None:
+        self.documents.append((chat_id, filename, data))

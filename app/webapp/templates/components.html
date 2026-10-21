@@ -60,3 +60,26 @@
     {% endfor %}
   </div>
 {% endmacro %}
+
+{% macro down_banner(d, report_button=false) %}
+  <div class="downtime">
+    <div class="downtime-head">
+      <span class="siren">🚨</span>
+      <div>
+        <div class="downtime-title">«{{ d.machine.name }}» стоит {{ d.days }} {{ d.days | plural("день", "дня", "дней") }}</div>
+        <div class="downtime-why">{{ "сломан по отчёту" if d.broken else "нет связи с аппаратом" }} с {{ d.since.astimezone(tz).strftime("%d.%m %H:%M") }}</div>
+      </div>
+    </div>
+    {% if d.daily_loss %}
+      <div class="downtime-money">
+        <div><span>упущено</span><b>≈ {{ d.lost | rub }}</b></div>
+        <div><span>каждый день простоя</span><b>−{{ d.daily_loss | rub }}</b></div>
+      </div>
+    {% endif %}
+    <div class="downtime-call">Каждый день простоя — минус выручка. Чините как можно скорее!</div>
+    {% if report_button %}
+      <button class="btn" style="background:#fff;color:#c0262c;margin-top:10px"
+              hx-get="/app/service/machines/{{ d.machine.id }}/report">🛠 Починил — заполнить отчёт</button>
+    {% endif %}
+  </div>
+{% endmacro %}
