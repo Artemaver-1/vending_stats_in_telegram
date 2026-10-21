@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.domain.enums import ExpenseCategory, PaymentChannel
+from app.domain.reconciliation import DiscrepancyKind
 
 MONTHS = (
     "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -32,6 +33,13 @@ EXPENSE_LABELS = {
     ExpenseCategory.OTHER: "Прочее",
     ExpenseCategory.TAXES: "Налоги",
     ExpenseCategory.INSURANCE: "Страховые взносы",
+}
+
+DISCREPANCY_LABELS = {
+    DiscrepancyKind.SHIFTED: ("↔️", "SmartVend записал оплаты в другие дни"),
+    DiscrepancyKind.SMARTVEND_DOWN: ("📵", "SmartVend не видел оплат — работала только Вендиста"),
+    DiscrepancyKind.SMARTVEND_PARTIAL: ("⚠️", "SmartVend потерял часть оплат"),
+    DiscrepancyKind.SMARTVEND_EXTRA: ("❓", "В SmartVend больше, чем пришло в банк"),
 }
 
 

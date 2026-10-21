@@ -4,14 +4,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import Clock
-from app.db.models import Machine
+from app.db.models import DailyRevenue, Machine
 from app.domain.enums import PaymentChannel, RevenueSource
 from app.integrations.vendista import CardPayment
-from app.repositories.telemetry import DailyRevenueWriter, TelemetrySaleRepository
 
 
 @dataclass(slots=True)
@@ -21,12 +20,11 @@ class MachineImport:
     last_day: date | None = None
     amount: Decimal = field(default_factory=Decimal)
     payments: int = 0
-    # Card payments from days SmartVend already covers; they stay out to avoid counting twice.
-    skipped: int = 0
 
 
 @dataclass(slots=True)
 class VendistaImportResult:
+    covered_through: date | None = None
     machines: list[MachineImport] = field(default_factory=list)
     unknown_terminals: set[str] = field(default_factory=set)
 
@@ -38,18 +36,17 @@ class _Day:
 
 
 class VendistaImporter:
-    """Loads card revenue from a Vendista export for the days before SmartVend telemetry.
+    """Makes the Vendista export the source of card revenue for every day it covers.
 
-    Once a machine reports through SmartVend its card sales come from there, so only the
-    days before the machine's first telemetry sale are taken from the export. Importing
-    the same file again replaces what the previous import wrote.
+    The terminal's records carry the bank's dates, while SmartVend loses payments when it
+    is out of order and books queued ones on the day it reconnects. So for the period of
+    the export card revenue is replaced with Vendista's, and SmartVend keeps supplying
+    cards only for the days after it. Importing the same file twice changes nothing.
     """
 
     def __init__(self, session: AsyncSession, clock: Clock) -> None:
         self.session = session
         self.clock = clock
-        self.sales = TelemetrySaleRepository(session)
-        self.revenue = DailyRevenueWriter(session)
 
     async def run(self, payments: Iterable[CardPayment]) -> VendistaImportResult:
         machines = {
@@ -60,58 +57,63 @@ class VendistaImporter:
         }
         result = VendistaImportResult()
         days: dict[int, dict[date, _Day]] = defaultdict(lambda: defaultdict(_Day))
-        reports: dict[int, MachineImport] = {}
-        cutoffs: dict[int, date | None] = {}
 
         for payment in payments:
+            day = payment.paid_at.astimezone(self.clock.tz).date()
+            # The export is cut at one moment for every terminal, so the newest payment
+            # in the whole file marks how far it reaches.
+            result.covered_through = max(result.covered_through or day, day)
             machine = machines.get(payment.terminal_id)
             if machine is None:
                 result.unknown_terminals.add(payment.terminal_id)
-                continue
-            if machine.id not in cutoffs:
-                first_telemetry = await self.sales.first_sale_at(machine.id)
-                cutoffs[machine.id] = (
-                    first_telemetry.astimezone(self.clock.tz).date() if first_telemetry else None
-                )
-                reports[machine.id] = MachineImport(machine=machine.name)
-
-            day = payment.paid_at.astimezone(self.clock.tz).date()
-            cutoff = cutoffs[machine.id]
-            if cutoff is not None and day >= cutoff:
-                reports[machine.id].skipped += 1
                 continue
             bucket = days[machine.id][day]
             bucket.amount += payment.amount
             bucket.count += -1 if payment.is_refund else 1
 
-        for machine_id, report in reports.items():
-            per_day = days[machine_id]
+        if result.covered_through is None:
+            return result
+        for machine in machines.values():
+            per_day = days.get(machine.id)
             if not per_day:
-                result.machines.append(report)
                 continue
-            report.first_day, report.last_day = min(per_day), max(per_day)
-            report.amount = sum((d.amount for d in per_day.values()), Decimal(0))
-            report.payments = sum(d.count for d in per_day.values())
-            rows = [
-                {
-                    "machine_id": machine_id,
-                    "day": day,
-                    "channel": PaymentChannel.CARD,
-                    "amount": bucket.amount,
-                    "sales_count": max(bucket.count, 0),
-                    "source": RevenueSource.VENDISTA,
-                }
-                for day, bucket in sorted(per_day.items())
-                if bucket.amount
-            ]
-            await self.revenue.replace_days(
-                report.first_day,
-                report.last_day,
-                RevenueSource.VENDISTA,
-                rows,
-                machine_id=machine_id,
-            )
-            result.machines.append(report)
-
+            result.machines.append(await self._replace(machine, per_day, result.covered_through))
         await self.session.flush()
         return result
+
+    async def _replace(
+        self, machine: Machine, per_day: dict[date, _Day], covered_through: date
+    ) -> MachineImport:
+        first_day = min(per_day)
+        await self.session.execute(
+            delete(DailyRevenue).where(
+                DailyRevenue.machine_id == machine.id,
+                DailyRevenue.channel == PaymentChannel.CARD,
+                DailyRevenue.day >= first_day,
+                DailyRevenue.day <= covered_through,
+            )
+        )
+        rows = [
+            {
+                "machine_id": machine.id,
+                "day": day,
+                "channel": PaymentChannel.CARD,
+                "amount": bucket.amount,
+                "sales_count": max(bucket.count, 0),
+                "source": RevenueSource.VENDISTA,
+            }
+            for day, bucket in sorted(per_day.items())
+            if bucket.amount
+        ]
+        if rows:
+            await self.session.execute(insert(DailyRevenue).values(rows))
+        machine.vendista_covered_through = max(
+            machine.vendista_covered_through or covered_through, covered_through
+        )
+        return MachineImport(
+            machine=machine.name,
+            first_day=first_day,
+            last_day=max(per_day),
+            amount=sum((d.amount for d in per_day.values()), Decimal(0)),
+            payments=sum(d.count for d in per_day.values()),
+        )

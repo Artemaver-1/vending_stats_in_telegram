@@ -12,6 +12,7 @@ from app.domain.enums import TaskStatus
 from app.domain.inspection import CHECKLIST
 from app.formatting import (
     CHANNEL_LABELS,
+    DISCREPANCY_LABELS,
     EXPENSE_LABELS,
     MONTHS_SHORT,
     WEEKDAYS,
@@ -35,6 +36,7 @@ templates.env.filters.update(
 templates.env.globals.update(
     CHECKLIST=CHECKLIST,
     CHANNEL_LABELS=CHANNEL_LABELS,
+    DISCREPANCY_LABELS=DISCREPANCY_LABELS,
     EXPENSE_LABELS=EXPENSE_LABELS,
     TaskStatus=TaskStatus,
 )

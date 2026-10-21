@@ -34,6 +34,9 @@ class Machine(TimestampMixin, Base):
     # Identifiers of the same machine in external systems, used to match synced data.
     vendista_terminal_id: Mapped[str | None] = mapped_column(String(64), unique=True)
     telemetry_device_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # Card revenue up to this day comes from the Vendista export, which has the bank's
+    # dates; SmartVend only fills in the days after the latest export.
+    vendista_covered_through: Mapped[date | None]
 
     # Last connection status seen in the telemetry, refreshed by the worker.
     is_online: Mapped[bool | None]

@@ -62,8 +62,9 @@
 <h2>Вендиста</h2>
 <form class="card" hx-post="/app/admin/vendista/import" hx-encoding="multipart/form-data">
   <p class="hint" style="margin-top:0">
-    Выгрузка «Транзакции» в CSV из личного кабинета. Безнал берётся за дни, когда на силомере
-    ещё не было SmartVend; повторная загрузка того же файла ничего не задвоит.
+    Выгрузка «Транзакции» в CSV из личного кабинета. За все дни выгрузки безнал берётся из
+    Вендисты — у банка точные даты; SmartVend даёт безнал только за дни после неё.
+    Повторная загрузка того же файла ничего не задвоит.
   </p>
   <input type="file" name="export" accept=".csv,text/csv" required>
   <button class="btn small refresh" type="submit" style="margin-top:10px" hx-disabled-elt="this">
@@ -73,4 +74,5 @@
 <div class="legend" style="margin:0 6px">
   <span><i style="background:var(--ok)"></i>весь день</span><span><i style="background:var(--warn)"></i>с перебоями</span><span><i style="background:var(--danger)"></i>офлайн</span>
 </div>
+<a class="btn secondary" hx-get="/app/admin/reconciliation" style="margin-top:4px">🔍 Сверка безнала: Вендиста и SmartVend</a>
 {% endblock %}

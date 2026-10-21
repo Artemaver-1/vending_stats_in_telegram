@@ -101,12 +101,20 @@ To move: take a fresh dump and stop everything on the old machine (two bots poll
 same token conflict), then on the new one clone the repo, copy `.env` and the dump,
 `docker compose up -d db`, run `scripts/restore.sh <dump>` and `docker compose up -d`.
 
-## Historical card revenue
+## Card revenue: Vendista vs SmartVend
 
-Before SmartVend was installed, card payments are known only from the Vendista terminal.
-Admin → Аппараты → Вендиста accepts the "Транзакции" CSV export: successful payments
-minus successful refunds, Moscow time converted to Chelyabinsk, and only for days before
-the machine's first SmartVend sale, so nothing is counted twice.
+The Vendista terminal records every card payment with the bank's date. SmartVend sees them
+only while it works and has a paid SIM; payments queued while it is offline are booked on
+the day it reconnects, and during repairs it sees nothing at all.
+
+So for every day covered by the latest Vendista export (Admin → Аппараты → Вендиста,
+"Транзакции" CSV) card revenue comes from Vendista: successful payments minus successful
+refunds, Moscow time converted to Chelyabinsk. SmartVend supplies cards only for the days
+after the export; coins and bills always come from SmartVend.
+
+Admin → Аппараты → Сверка безнала compares the two day by day and groups differences into
+episodes: money booked on other days (queue, midnight), days SmartVend saw nothing, payments
+it lost for good, and anything SmartVend shows on top of the bank.
 
 ## Development
 
@@ -138,7 +146,7 @@ insurance contributions, net profit.
   location, and expenses that aren't tied to a machine are split between active machines.
 - Payback is the first month in which cumulative net profit since launch covers the
   purchase cost of the machine.
-- Card, coin and bill revenue all come from SmartVend; the Vendista card terminal export is
-  only used for reconciliation, so card payments are never counted twice.
+- Card revenue comes from Vendista for the days its export covers and from SmartVend after
+  that; coins and bills come from SmartVend. A card payment is never counted twice.
 - Days are bucketed in `Asia/Yekaterinburg`, where the machines stand, regardless of the
   timezone configured on the controllers.

@@ -162,7 +162,8 @@ class SalesSync(_TelemetrySync):
         for chunk in batched(rows, UPSERT_CHUNK):
             await self.sales.upsert_many(chunk)
 
-        await self._rebuild_daily_revenue(first_day, today)
+        covered = {m.id: m.vendista_covered_through for m in machines.values()}
+        await self._rebuild_daily_revenue(first_day, today, covered)
         await self._fill_launch_dates(machines.values())
 
         state.synced_through = today
@@ -172,7 +173,9 @@ class SalesSync(_TelemetrySync):
             logger.warning("Skipped %d sales from controllers unknown to the database", skipped)
         return SalesSyncResult(first_day, today, fetched=len(rows), skipped=skipped)
 
-    async def _rebuild_daily_revenue(self, first: date, last: date) -> None:
+    async def _rebuild_daily_revenue(
+        self, first: date, last: date, vendista_covered: dict[int, date | None]
+    ) -> None:
         tz = self.clock.tz
         sales = await self.sales.between(day_start(first, tz), day_start(last + timedelta(1), tz))
 
@@ -184,6 +187,9 @@ class SalesSync(_TelemetrySync):
                 (PaymentChannel.COIN, sale.coin),
                 (PaymentChannel.CARD, sale.card),
             ):
+                covered_through = vendista_covered.get(sale.machine_id)
+                if channel is PaymentChannel.CARD and covered_through and day <= covered_through:
+                    continue
                 if amount > 0:
                     total = totals[(sale.machine_id, day, channel)]
                     total.amount += amount

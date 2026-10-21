@@ -68,9 +68,30 @@ async def machines(session: AsyncSession) -> dict[str, Machine]:
     return {"pushkina": pushkina, "dynamo": dynamo}
 
 
-async def test_import_fills_days_before_telemetry_only(
+async def test_vendista_replaces_card_revenue_for_the_days_it_covers(
     session: AsyncSession, machines: dict[str, Machine]
 ) -> None:
+    pushkina = machines["pushkina"]
+    # SmartVend put a queued payment on the day it reconnected.
+    session.add_all(
+        [
+            DailyRevenue(
+                machine_id=pushkina.id,
+                day=date(2025, 6, 3),
+                channel=PaymentChannel.CARD,
+                amount=Decimal("40"),
+                source=RevenueSource.TELEMETRY,
+            ),
+            DailyRevenue(
+                machine_id=pushkina.id,
+                day=date(2025, 6, 3),
+                channel=PaymentChannel.COIN,
+                amount=Decimal("50"),
+                source=RevenueSource.TELEMETRY,
+            ),
+        ]
+    )
+    await session.flush()
     data = export(
         f"1;1;20.05.2024 12:00:00;E1;131508;10,00;x;{OK}",
         f"2;2;20.05.2024 13:00:00;E1;131508;10,00;x;{OK}",
@@ -84,21 +105,17 @@ async def test_import_fills_days_before_telemetry_only(
     # Same file once more must not double anything.
     await importer.run(read_transactions(data))
 
-    by_name = {m.machine: m for m in result.machines}
-    assert (by_name["Пушкина"].payments, by_name["Пушкина"].skipped) == (3, 1)
-    assert by_name["Пушкина"].last_day == date(2025, 6, 2)
+    assert result.covered_through == date(2025, 6, 3)
+    assert pushkina.vendista_covered_through == date(2025, 6, 3)
     assert result.unknown_terminals == {"999999"}
 
     rows = (
-        await session.scalars(
-            select(DailyRevenue).where(DailyRevenue.source == RevenueSource.VENDISTA)
-        )
+        await session.scalars(select(DailyRevenue).where(DailyRevenue.machine_id == pushkina.id))
     ).all()
-    assert sorted((r.machine_id, r.day, r.amount, r.sales_count) for r in rows) == sorted(
-        [
-            (machines["pushkina"].id, date(2024, 5, 20), Decimal("20"), 2),
-            (machines["pushkina"].id, date(2025, 6, 2), Decimal("10"), 1),
-            (machines["dynamo"].id, date(2024, 7, 2), Decimal("10"), 1),
-        ]
-    )
-    assert {r.channel for r in rows} == {PaymentChannel.CARD}
+    assert sorted((r.day, r.channel, r.amount, r.source) for r in rows) == [
+        (date(2024, 5, 20), PaymentChannel.CARD, Decimal("20"), RevenueSource.VENDISTA),
+        (date(2025, 6, 2), PaymentChannel.CARD, Decimal("10"), RevenueSource.VENDISTA),
+        (date(2025, 6, 3), PaymentChannel.CARD, Decimal("10"), RevenueSource.VENDISTA),
+        # Coins are SmartVend's business and stay untouched.
+        (date(2025, 6, 3), PaymentChannel.COIN, Decimal("50"), RevenueSource.TELEMETRY),
+    ]

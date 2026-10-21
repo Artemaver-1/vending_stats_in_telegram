@@ -1,0 +1,72 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+{% set r = report %}
+<h1>Сверка безнала</h1>
+<p class="subtitle">Банк (Вендиста) против SmartVend</p>
+
+<div class="segmented">
+  {% for m in machines %}
+    <a hx-get="/app/admin/reconciliation?machine={{ m.id }}" class="{{ 'active' if m.id == selected.id }}">{{ m.name }}</a>
+  {% endfor %}
+</div>
+
+{% if not r.months %}
+  <div class="list"><div class="empty">
+    Сравнивать пока нечего: нужны и продажи SmartVend, и загруженная выгрузка Вендисты.
+  </div></div>
+{% else %}
+  <div class="card">
+    <div class="hint">{{ r.first.strftime("%d.%m.%Y") }} — {{ r.last.strftime("%d.%m.%Y") }}</div>
+    <table class="plain" style="margin-top:6px">
+      <tr><td class="muted">Вендиста</td><td class="right"><b>{{ r.vendista | rub }}</b></td></tr>
+      <tr><td class="muted">SmartVend</td><td class="right">{{ r.smartvend | rub }}</td></tr>
+      <tr><td class="muted">Разница</td><td class="right {{ 'danger' if r.vendista != r.smartvend }}">{{ (r.vendista - r.smartvend) | rub }}</td></tr>
+    </table>
+    <p class="hint" style="margin:8px 0 0">В отчётах безнал за эти дни берётся из Вендисты.</p>
+  </div>
+
+  <h2>Расхождения · {{ r.discrepancies | length }}</h2>
+  {% for e in r.discrepancies %}
+    {% set d = e.discrepancy %}
+    {% set icon, title = DISCREPANCY_LABELS[d.kind] %}
+    <div class="card {{ 'warn' if d.kind.value != 'shifted' }}">
+      <div class="row between">
+        <b>{{ icon }} {{ d.first.strftime("%d.%m.%Y") }}{% if d.last != d.first %} — {{ d.last.strftime("%d.%m.%Y") }}{% endif %}</b>
+        <span class="{{ 'danger' if d.balance > 0 else ('ok' if d.balance == 0 else '') }}">{{ ("+" if d.balance > 0 else "") ~ (d.balance | rub) }}</span>
+      </div>
+      <div style="margin-top:4px">{{ title }}</div>
+      <div class="hint" style="margin-top:4px">
+        Вендиста {{ d.vendista | rub }} · SmartVend {{ d.smartvend | rub }}
+        {% if d.kind.value == "shifted" %}
+          · {{ d.moved | rub }} перенесено
+          {% if (d.last - d.first).days <= 1 %}— оплаты около полуночи попали в соседний день{% else %}— скорее всего, очередь: SmartVend был без связи или без оплаченной SIM и выгрузил оплаты позже{% endif %}
+        {% elif d.kind.value == "smartvend_down" %}
+          — SmartVend не работал или был снят, терминал принимал оплату сам
+        {% elif d.kind.value == "smartvend_partial" %}
+          — часть оплат SmartVend так и не получил{% if d.moved > 0 %}, {{ d.moved | rub }} пришло с опозданием{% endif %}
+        {% else %}
+          — проверить вручную: возможно, тестовые оплаты или отменённые банком
+        {% endif %}
+        {% if e.offline_share is not none and e.offline_share > 0.05 %}· офлайн {{ e.offline_share | percent }} этих дней{% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="list"><div class="empty">✅ Расхождений нет — день в день</div></div>
+  {% endfor %}
+
+  <h2>По месяцам</h2>
+  <div class="card">
+    <table class="plain">
+      <tr><td class="muted">Месяц</td><td class="right muted">Вендиста</td><td class="right muted">SmartVend</td><td class="right muted">Разница</td></tr>
+      {% for m in r.months %}
+        <tr>
+          <td>{{ m.month | month_short }} {{ m.month.year % 100 }}</td>
+          <td class="right">{{ m.vendista | rub }}</td>
+          <td class="right">{{ m.smartvend | rub }}</td>
+          <td class="right {{ 'danger' if m.diff > 0 else '' }}">{{ m.diff | rub if m.diff else "—" }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endif %}
+{% endblock %}
