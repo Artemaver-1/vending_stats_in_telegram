@@ -27,7 +27,18 @@
     </div>
     {{ check_results(r) }}
     {% if r.comment %}<p style="margin:10px 0 0; white-space:pre-wrap">💬 {{ r.comment }}</p>{% endif %}
-    <div class="hint" style="margin-top:8px">{{ r.completed_by.name if r.completed_by else "" }}</div>
+    <div class="row between" style="margin-top:8px">
+      <span class="hint">{{ r.completed_by.name if r.completed_by else "" }}</span>
+      <button class="btn small danger" hx-post="/app/admin/reports/{{ r.id }}/delete{{ '?machine=%d' % selected if selected }}"
+              hx-confirm="Точно хотите удалить отчёт?">🗑</button>
+    </div>
+    <details style="margin-top:8px">
+      <summary class="hint">✏️ {{ "Изменить комментарий" if r.comment else "Добавить комментарий" }}</summary>
+      <form hx-post="/app/admin/reports/{{ r.id }}/comment{{ '?machine=%d' % selected if selected }}" style="margin-top:8px">
+        <textarea name="comment">{{ r.comment or "" }}</textarea>
+        <button class="btn small" type="submit" style="margin-top:8px">Сохранить</button>
+      </form>
+    </details>
   </div>
 {% else %}
   <div class="list"><div class="empty">Отчётов пока нет</div></div>

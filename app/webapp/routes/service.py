@@ -1,9 +1,10 @@
+import json
 from dataclasses import dataclass
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from app.api.deps import ClockDep, SessionDep
 from app.db.models import Machine, Task
@@ -110,7 +111,12 @@ async def complete_task(
 
 @router.get("/machines/{machine_id}/report", response_class=HTMLResponse)
 async def report_form(
-    request: Request, machine_id: int, user: CurrentUser, tasks: TasksDep, session: SessionDep
+    request: Request,
+    machine_id: int,
+    user: CurrentUser,
+    tasks: TasksDep,
+    session: SessionDep,
+    back: Literal["home", "machine"] = "home",
 ) -> HTMLResponse:
     machine = await _machine_or_404(session, machine_id)
     return render(
@@ -119,6 +125,7 @@ async def report_form(
         machine=machine,
         last=await tasks.last_inspection(machine.id),
         checklist=CHECKLIST,
+        back_url=f"/app/machines/{machine.id}" if back == "machine" else "/app/service",
     )
 
 
@@ -152,3 +159,23 @@ async def submit_report(
     )
     page = await home(request, user, tasks, session, clock)
     return with_toast(page, "Спасибо! Отчёт отправлен")
+
+
+@router.post("/reports/{report_id}/delete")
+async def delete_report(
+    report_id: int, user: CurrentUser, tasks: TasksDep, session: SessionDep
+) -> Response:
+    report = await _task_or_404(tasks, report_id)
+    machine_id = report.machine_id
+    try:
+        await tasks.delete_report(report)
+    except TaskError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await session.commit()
+    target = f"/app/machines/{machine_id}" if machine_id else "/app/service"
+    return Response(
+        headers={
+            "HX-Location": json.dumps({"path": target, "target": "#view"}),
+            "HX-Trigger": json.dumps({"toast": "Отчёт удалён"}),
+        }
+    )

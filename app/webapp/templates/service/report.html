@@ -1,5 +1,5 @@
 {% from "components.html" import check_results with context %}
-<div data-back="/app/service"></div>
+<div data-back="{{ back_url }}"></div>
 <h1>Отчёт «{{ machine.name }}»</h1>
 <p class="subtitle">Ответь на 4 вопроса и напиши комментарий</p>
 
@@ -38,4 +38,5 @@
   </div>
 
   <button class="btn" type="submit">Отправить отчёт</button>
+  <button class="btn secondary" type="button" hx-get="{{ back_url }}">Отмена</button>
 </form>

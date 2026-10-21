@@ -84,3 +84,18 @@ async def test_days_before_telemetry_are_unknown(session: AsyncSession) -> None:
     assert all(months[date(2026, m, 1)] is None for m in range(1, 10))
     assert months[date(2026, 10, 1)] is not None
     assert months[date(2026, 12, 1)] is None
+
+
+def test_estimate_from_payments() -> None:
+    from app.domain.uptime import estimate_from_payments
+
+    d = lambda n: date(2024, 7, n)  # noqa: E731
+    paid = {d(3), d(4), d(6), d(10)}
+    days = estimate_from_payments(paid, d(1), d(12))
+    # Before the first payment the machine wasn't running yet.
+    assert [days[d(1)], days[d(2)]] == [False, False]
+    # A single empty day between payments is just a slow day.
+    assert days[d(5)] is True
+    # Three empty days in a row mean it was off; so does the tail after the last payment.
+    assert [days[d(7)], days[d(8)], days[d(9)]] == [False, False, False]
+    assert [days[d(11)], days[d(12)]] == [False, False]

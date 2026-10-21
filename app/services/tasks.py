@@ -160,7 +160,8 @@ class TaskService:
 
         works = results[MACHINE_WORKS.key]
         if not works and not machine.is_broken:
-            machine.broken_since = self.clock.now()
+            # Same instant as the report, so deleting the report can tell it caused this.
+            machine.broken_since = task.completed_at
             outcome.machine_broke = True
         elif works and machine.is_broken:
             machine.broken_since = None
@@ -170,6 +171,40 @@ class TaskService:
         if not machine.is_broken:
             await self._schedule_for(machine)
         return outcome
+
+    async def set_report_comment(self, report: Task, comment: str) -> None:
+        if report.kind is not TaskKind.INSPECTION or report.is_open:
+            raise TaskError("Это не отчёт")
+        report.comment = comment.strip() or None
+        await self.session.flush()
+
+    async def delete_report(self, report: Task) -> None:
+        """Removes a filed report as if the visit never happened.
+
+        If it was the machine's latest report, the weekly schedule and the broken flag are
+        rebuilt from the report before it.
+        """
+        if report.kind is not TaskKind.INSPECTION or report.is_open:
+            raise TaskError("Это не отчёт")
+        machine = report.machine
+        latest = await self.last_inspection(report.machine_id) if report.machine_id else None
+        await self.session.delete(report)
+        await self.session.flush()
+        if machine is None or latest is None or latest.id != report.id:
+            return
+
+        if machine.broken_since is not None and machine.broken_since == report.completed_at:
+            machine.broken_since = None
+        previous = await self.last_inspection(machine.id)
+        if previous is not None and machine.broken_since is None:
+            down = any(c.item == MACHINE_WORKS.key and not c.ok for c in previous.checks)
+            machine.broken_since = previous.completed_at if down else None
+
+        if pending := await self._open_inspection(machine.id):
+            await self.session.delete(pending)
+            await self.session.flush()
+        if not machine.is_broken:
+            await self._schedule_for(machine)
 
     async def reports(self, machine_id: int | None = None, limit: int = 50) -> Sequence[Task]:
         stmt = (

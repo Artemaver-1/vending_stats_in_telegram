@@ -63,12 +63,19 @@
   <span><i style="background:var(--ok)"></i>весь день</span><span><i style="background:var(--warn)"></i>с перебоями</span><span><i style="background:var(--danger)"></i>офлайн</span><span><i style="background:var(--line)"></i>нет данных</span>
 </div>
 
-<h2>Последний отчёт</h2>
-<div class="card">
-  {% if last_report %}
-    <div class="hint">{{ last_report.completed_at.astimezone(tz).strftime("%d.%m.%Y %H:%M") }}{% if last_report.completed_by %} · {{ last_report.completed_by.name }}{% endif %}</div>
-    {{ check_results(last_report) }}
-    {% if last_report.comment %}<p style="margin:8px 0 0; white-space:pre-wrap">💬 {{ last_report.comment }}</p>{% endif %}
-  {% else %}<span class="hint">Отчётов ещё не было</span>{% endif %}
-</div>
-<button class="btn" hx-get="/app/service/machines/{{ machine.id }}/report">📝 Новый отчёт</button>
+<button class="btn" hx-get="/app/service/machines/{{ machine.id }}/report?back=machine" style="margin-top:14px">📝 Новый отчёт</button>
+
+<h2>Отчёты</h2>
+{% for report in reports %}
+  <div class="card">
+    <div class="row between">
+      <span class="hint">{{ report.completed_at.astimezone(tz).strftime("%d.%m.%Y %H:%M") }}{% if report.completed_by %} · {{ report.completed_by.name }}{% endif %}</span>
+      <button class="btn small danger" hx-post="/app/service/reports/{{ report.id }}/delete"
+              hx-confirm="Точно хотите удалить отчёт?">🗑</button>
+    </div>
+    {{ check_results(report) }}
+    {% if report.comment %}<p style="margin:8px 0 0; white-space:pre-wrap">💬 {{ report.comment }}</p>{% endif %}
+  </div>
+{% else %}
+  <div class="list"><div class="empty">Отчётов ещё не было</div></div>
+{% endfor %}

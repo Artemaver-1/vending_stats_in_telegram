@@ -1,16 +1,19 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import Clock
-from app.db.models import Machine
-from app.domain.uptime import Transition, daily_uptime
+from app.db.models import DailyRevenue, EstimatedUptime, Machine
+from app.domain.enums import PaymentChannel, RevenueSource
+from app.domain.uptime import Transition, daily_uptime, estimate_from_payments
 from app.repositories.telemetry import ConnectionEventRepository, TelemetrySaleRepository
 
 
 class UptimeService:
     def __init__(self, session: AsyncSession, clock: Clock) -> None:
+        self.session = session
         self.events = ConnectionEventRepository(session)
         self.sales = TelemetrySaleRepository(session)
         self.clock = clock
@@ -26,14 +29,32 @@ class UptimeService:
             now=self.clock.now(),
             current_online=machine.is_online,
         )
-        # Before the telemetry module reported anything there is no connection to speak of,
-        # so those days stay unknown rather than "offline".
+        # Before SmartVend reported anything, fall back to the estimate made from Vendista
+        # payments; where there is none either, the day stays unknown rather than "offline".
         first_event = events[0].occurred_at.astimezone(self.clock.tz).date() if events else None
         known_from = await self._telemetry_start(machine, first_event)
+        estimated = await self._estimated(machine.id, first, last)
         for day in uptime:
             if known_from is None or day < known_from:
-                uptime[day] = None
+                worked = estimated.get(day)
+                uptime[day] = None if worked is None else float(worked)
         return uptime
+
+    async def telemetry_start(self, machine: Machine) -> date | None:
+        """First day SmartVend knew anything about the machine's connection."""
+        events = await self.events.for_machine(machine.id)
+        first_event = events[0].occurred_at.astimezone(self.clock.tz).date() if events else None
+        return await self._telemetry_start(machine, first_event)
+
+    async def _estimated(self, machine_id: int, first: date, last: date) -> dict[date, bool]:
+        rows = await self.session.execute(
+            select(EstimatedUptime.day, EstimatedUptime.worked).where(
+                EstimatedUptime.machine_id == machine_id,
+                EstimatedUptime.day >= first,
+                EstimatedUptime.day <= last,
+            )
+        )
+        return {day: worked for day, worked in rows}
 
     async def monthly(self, machine: Machine, year: int) -> dict[date, float | None]:
         """Average daily uptime for each month of the year; None for months with no data."""
@@ -56,3 +77,45 @@ class UptimeService:
         if machine.launched_on is not None and start is not None:
             start = max(start, machine.launched_on)
         return start
+
+
+class UptimeEstimator:
+    """Fills `estimated_uptime` from Vendista card payments for the days between a
+    machine's launch and the first connection data from SmartVend."""
+
+    def __init__(self, session: AsyncSession, clock: Clock) -> None:
+        self.session = session
+        self.uptime = UptimeService(session, clock)
+
+    async def rebuild(self, machine: Machine) -> int:
+        payment_days = set(
+            await self.session.scalars(
+                select(DailyRevenue.day).where(
+                    DailyRevenue.machine_id == machine.id,
+                    DailyRevenue.channel == PaymentChannel.CARD,
+                    DailyRevenue.source == RevenueSource.VENDISTA,
+                    DailyRevenue.amount > 0,
+                )
+            )
+        )
+        await self.session.execute(
+            delete(EstimatedUptime).where(EstimatedUptime.machine_id == machine.id)
+        )
+        if not payment_days:
+            return 0
+        first = machine.launched_on or min(payment_days)
+        telemetry_start = await self.uptime.telemetry_start(machine)
+        last = (
+            telemetry_start - timedelta(days=1)
+            if telemetry_start
+            else machine.vendista_covered_through or max(payment_days)
+        )
+        if first > last:
+            return 0
+        days = estimate_from_payments(payment_days, first, last)
+        await self.session.execute(
+            insert(EstimatedUptime).values(
+                [{"machine_id": machine.id, "day": d, "worked": w} for d, w in days.items()]
+            )
+        )
+        return len(days)

@@ -83,7 +83,7 @@ async def machine_page(
         user=user,
         machine=machine,
         revenue=await machine_revenue(session, machine, today),
-        last_report=await tasks.last_inspection(machine.id),
+        reports=await tasks.reports(machine.id, limit=5),
         view=view,
         year=year,
         years=years,

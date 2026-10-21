@@ -77,3 +77,26 @@ def _day_start(day: date, tz: ZoneInfo) -> datetime:
 
 def _days(first: date, last: date) -> list[date]:
     return [first + timedelta(days=i) for i in range((last - first).days + 1)]
+
+
+def estimate_from_payments(
+    payment_days: set[date], first: date, last: date, *, quiet_days_allowed: int = 1
+) -> dict[date, bool]:
+    """Guesses which days a machine worked from the days its card terminal took money.
+
+    Used for the time before SmartVend reported connectivity. A single day without card
+    payments happens on a slow day; a longer run of empty days means it was off.
+    """
+    result: dict[date, bool] = {}
+    quiet: list[date] = []
+    for day in _days(first, last):
+        if day in payment_days:
+            for empty in quiet:
+                result[empty] = len(quiet) <= quiet_days_allowed and bool(result)
+            quiet = []
+            result[day] = True
+        else:
+            quiet.append(day)
+    for empty in quiet:
+        result[empty] = False
+    return dict(sorted(result.items()))

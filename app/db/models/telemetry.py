@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, String
@@ -40,3 +40,16 @@ class ConnectionEvent(Base):
     notified: Mapped[bool] = mapped_column(default=False)
 
     machine: Mapped[Machine] = relationship()
+
+
+class EstimatedUptime(Base):
+    """Whether a machine worked on a day before SmartVend reported its connection,
+    judged by card payments on the Vendista terminal."""
+
+    __tablename__ = "estimated_uptime"
+
+    machine_id: Mapped[int] = mapped_column(
+        ForeignKey("machines.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(primary_key=True)
+    worked: Mapped[bool]

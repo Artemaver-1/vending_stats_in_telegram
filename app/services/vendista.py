@@ -11,6 +11,7 @@ from app.clock import Clock
 from app.db.models import DailyRevenue, Machine
 from app.domain.enums import PaymentChannel, RevenueSource
 from app.integrations.vendista import CardPayment
+from app.services.uptime import UptimeEstimator
 
 
 @dataclass(slots=True)
@@ -79,6 +80,10 @@ class VendistaImporter:
                 continue
             result.machines.append(await self._replace(machine, per_day, result.covered_through))
         await self.session.flush()
+        # Payment days also tell when a machine worked before SmartVend watched it.
+        estimator = UptimeEstimator(self.session, self.clock)
+        for machine in machines.values():
+            await estimator.rebuild(machine)
         return result
 
     async def _replace(

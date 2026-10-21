@@ -13,6 +13,14 @@
     });
   }
 
+  // hx-confirm through Telegram's own dialog: a plain window.confirm may not show up
+  // inside the Mini App webview.
+  document.body.addEventListener("htmx:confirm", (event) => {
+    if (!event.detail.question || !tg || !tg.showConfirm) return;
+    event.preventDefault();
+    tg.showConfirm(event.detail.question, (ok) => ok && event.detail.issueRequest(true));
+  });
+
   document.body.addEventListener("htmx:configRequest", (event) => {
     event.detail.headers["Authorization"] = "tma " + initData;
   });
