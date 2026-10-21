@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -34,5 +34,9 @@ class Machine(TimestampMixin, Base):
     # Identifiers of the same machine in external systems, used to match synced data.
     vendista_terminal_id: Mapped[str | None] = mapped_column(String(64), unique=True)
     telemetry_device_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+
+    # Last connection status seen in the telemetry, refreshed by the worker.
+    is_online: Mapped[bool | None]
+    status_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     location: Mapped[Location | None] = relationship(back_populates="machines")

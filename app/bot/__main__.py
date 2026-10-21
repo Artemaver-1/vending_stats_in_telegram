@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 COMMANDS = [
     BotCommand(command="month", description="Финансы за месяц"),
     BotCommand(command="payback", description="Окупаемость"),
+    BotCommand(command="machines", description="Связь с аппаратами"),
     BotCommand(command="help", description="Что умеет бот"),
 ]
 

@@ -12,6 +12,7 @@ from app.domain.periods import next_month, previous_month
 class MainMenu(StrEnum):
     FINANCE = "📊 Финансы"
     PAYBACK = "⏳ Окупаемость"
+    MACHINES = "📡 Аппараты"
 
 
 class PnlPage(CallbackData, prefix="pnl"):

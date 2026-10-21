@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.15,<4",
     "alembic>=1.14",
+    "apscheduler>=3.11,<4",
     "asyncpg>=0.30",
     "fastapi>=0.115",
     "httpx>=0.28",
@@ -18,7 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "aiosqlite>=0.20",
     "mypy>=1.13",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
@@ -52,3 +52,7 @@ testpaths = ["tests"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true

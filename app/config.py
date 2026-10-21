@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -20,6 +22,15 @@ class Settings(BaseSettings):
 
     timezone: str = "Asia/Yekaterinburg"
     log_level: str = "INFO"
+
+    smartvend_api_key: SecretStr | None = None
+    smartvend_base_url: str = "https://api.smartvend.ru/v1.2"
+    # Where the very first sync starts; later runs resume from the stored cursor.
+    smartvend_history_start: date = date(2025, 1, 1)
+    # Controllers upload offline sales late, so each run re-reads a few past days.
+    sales_lookback_days: int = 3
+
+    default_machine_cost: Decimal = Decimal("320000")
 
     @field_validator("allowed_user_ids", mode="before")
     @classmethod
