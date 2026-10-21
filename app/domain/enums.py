@@ -49,3 +49,25 @@ class LeadActivityKind(StrEnum):
     MESSAGE = "message"
     MEETING = "meeting"
     VISIT = "visit"
+
+
+class UserRole(StrEnum):
+    ADMIN = "admin"
+    WORKER = "worker"
+
+
+class TaskKind(StrEnum):
+    INSPECTION = "inspection"
+    CUSTOM = "custom"
+
+
+class TaskStatus(StrEnum):
+    OPEN = "open"
+    DONE = "done"
+    CANCELED = "canceled"
+
+
+class PurchaseStatus(StrEnum):
+    NEW = "new"
+    ORDERED = "ordered"
+    DONE = "done"

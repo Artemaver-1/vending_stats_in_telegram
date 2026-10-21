@@ -49,9 +49,18 @@ services:
 
   api:
     <<: *app
-    command: ["uvicorn", "app.api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "app.api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
     ports:
       - "127.0.0.1:8000:8000"
+
+  # Gives the Mini App a public HTTPS address without a domain or port forwarding.
+  # The address changes on restart; the bot reads it from the metrics endpoint.
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.3
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "--url", "http://api:8000"]
+    depends_on:
+      - api
 
 volumes:
   pgdata:

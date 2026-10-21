@@ -1,0 +1,35 @@
+{% extends "admin/layout.html" %}
+{% from "components.html" import due_chip, check_results with context %}
+{% block content %}
+<h1>{{ task.title }}</h1>
+<p class="subtitle">{{ due_chip(task) }} · до {{ when(task.due_on) }}</p>
+
+<div class="card">
+  <table class="plain">
+    <tr><td class="muted">Тип</td><td class="right">{{ "Проверка силомера" if task.kind.value == "inspection" else "Разовая задача" }}</td></tr>
+    {% if task.machine %}<tr><td class="muted">Силомер</td><td class="right">{{ task.machine.name }}</td></tr>{% endif %}
+    <tr><td class="muted">Исполнитель</td><td class="right">{{ task.assignee.name if task.assignee else "любой из команды" }}</td></tr>
+    {% if task.completed_at %}
+      <tr><td class="muted">{{ "Выполнено" if task.status.value == "done" else "Отменено" }}</td>
+          <td class="right">{{ task.completed_at.astimezone(tz).strftime("%d.%m %H:%M") }}{% if task.completed_by %} · {{ task.completed_by.name }}{% endif %}</td></tr>
+    {% endif %}
+  </table>
+</div>
+
+{% if task.description %}<div class="card" style="white-space:pre-wrap">{{ task.description }}</div>{% endif %}
+
+{% if task.attachment and task.attachment.content_type.startswith("image/") %}
+  <div class="card"><img class="qr" src="{{ signer.sign('/app/attachments/%d' % task.attachment.id) }}" alt=""></div>
+{% endif %}
+
+{% if task.checks %}
+  <h2>Результат проверки</h2>
+  <div class="card">{{ check_results(task) }}</div>
+{% endif %}
+{% if task.comment %}<div class="card">💬 {{ task.comment }}</div>{% endif %}
+
+{% if task.is_open %}
+  <button class="btn danger" hx-post="/app/admin/tasks/{{ task.id }}/cancel"
+          hx-confirm="Отменить задачу?">Отменить задачу</button>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+<h1>{{ "Договор аренды" if contract else "Новый договор" }}</h1>
+
+<form hx-post="/app/admin/rent/contracts{{ '/%d' % contract.id if contract }}">
+  <label class="field"><span>Точка</span>
+    <select name="location_id" required>
+      {% for l in locations %}<option value="{{ l.id }}" {{ "selected" if contract and contract.location_id == l.id }}>{{ l.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <div class="segmented" style="margin-bottom:12px">
+    {% set type = contract.rent_type.value if contract else "fixed" %}
+    <label style="flex:1"><input type="radio" name="rent_type" value="fixed" {{ "checked" if type == "fixed" }} hidden onchange="this.form.amount.placeholder='Сумма в месяц, ₽'"><span class="btn small secondary" style="display:block">Фиксированная</span></label>
+    <label style="flex:1"><input type="radio" name="rent_type" value="percent" {{ "checked" if type == "percent" }} hidden onchange="this.form.amount.placeholder='Процент от выручки'"><span class="btn small secondary" style="display:block">% от выручки</span></label>
+  </div>
+  <div class="two">
+    <label class="field"><span>Сумма ₽ или процент</span>
+      <input name="amount" type="number" step="0.01" min="0.01" required inputmode="decimal"
+             value="{{ (contract.fixed_amount or contract.revenue_percent) if contract }}" placeholder="Сумма в месяц, ₽">
+    </label>
+    <label class="field"><span>Платить числа</span>
+      <input name="payment_day" type="number" min="1" max="28" required value="{{ contract.payment_day if contract else 15 }}">
+    </label>
+  </div>
+  <div class="two">
+    <label class="field"><span>Действует с</span><input name="valid_from" type="date" required value="{{ contract.valid_from.isoformat() if contract else today.replace(day=1).isoformat() }}"></label>
+    <label class="field"><span>по (необязательно)</span><input name="valid_to" type="date" value="{{ contract.valid_to.isoformat() if contract and contract.valid_to }}"></label>
+  </div>
+  <p class="hint">Аренда за месяц оплачивается в указанный день следующего месяца.</p>
+  <button class="btn" type="submit">Сохранить</button>
+</form>
+{% if contract %}
+  <button class="btn danger" style="margin-top:8px" hx-delete="/app/admin/rent/contracts/{{ contract.id }}" hx-confirm="Удалить договор вместе с начислениями?">Удалить договор</button>
+{% endif %}
+<style>.segmented input:checked + span { background: var(--accent); color: var(--accent-text); }</style>
+{% endblock %}

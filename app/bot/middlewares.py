@@ -1,37 +1,19 @@
 import logging
-from collections.abc import Awaitable, Callable, Collection
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, User
+from aiogram.types import TelegramObject
+from aiogram.types import User as TelegramUser
 
 from app.db import Database
+from app.domain.enums import UserRole
+from app.services.notifications import Messages, Notifier
+from app.services.staff import UserService
 
 logger = logging.getLogger(__name__)
 
 Handler = Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]]
-
-
-class AccessMiddleware(BaseMiddleware):
-    """Drops every update from users who aren't on the allow list."""
-
-    def __init__(self, allowed_ids: Collection[int]) -> None:
-        self.allowed_ids = frozenset(allowed_ids)
-
-    async def __call__(self, handler: Handler, event: TelegramObject, data: dict[str, Any]) -> Any:
-        user: User | None = data.get("event_from_user")
-        if user is not None and user.id in self.allowed_ids:
-            return await handler(event, data)
-
-        if user is not None:
-            logger.warning("Rejected update from %s (@%s)", user.id, user.username)
-            bot = data["bot"]
-            await bot.send_message(
-                user.id,
-                f"Доступ закрыт. Ваш Telegram ID: <code>{user.id}</code>\n"
-                "Передайте его владельцу бота, чтобы вас добавили.",
-            )
-        return None
 
 
 class DatabaseMiddleware(BaseMiddleware):
@@ -44,3 +26,35 @@ class DatabaseMiddleware(BaseMiddleware):
         async with self.db.session() as session:
             data["session"] = session
             return await handler(event, data)
+
+
+class AccessMiddleware(BaseMiddleware):
+    """Lets only active team members through and turns everyone else into an access request."""
+
+    def __init__(self, notifier: Notifier) -> None:
+        self.notifier = notifier
+
+    async def __call__(self, handler: Handler, event: TelegramObject, data: dict[str, Any]) -> Any:
+        tg_user: TelegramUser | None = data.get("event_from_user")
+        if tg_user is None:
+            return None
+
+        users = UserService(data["session"])
+        known = await users.by_telegram_id(tg_user.id)
+        user = await users.register_visitor(tg_user.id, tg_user.full_name, tg_user.username)
+        if user.is_active:
+            data["user"] = user
+            return await handler(event, data)
+
+        logger.info("Access request from %s (@%s)", tg_user.id, tg_user.username)
+        await data["bot"].send_message(
+            tg_user.id,
+            "Здравствуйте! Доступа пока нет — я передал запрос администратору.\n"
+            f"Ваш Telegram ID: <code>{tg_user.id}</code>",
+        )
+        if known is None:
+            await self.notifier.send(
+                await users.telegram_ids(UserRole.ADMIN),
+                Messages.access_request(tg_user.full_name, tg_user.username, tg_user.id),
+            )
+        return None

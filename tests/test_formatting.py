@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.bot.formatting import rub
+from app.formatting import rub
 
 
 @pytest.mark.parametrize(

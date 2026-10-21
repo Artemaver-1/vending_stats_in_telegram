@@ -1,0 +1,61 @@
+{% macro due_chip(task) -%}
+  {%- set days = (task.due_on - today).days -%}
+  {%- if not task.is_open -%}
+    <span class="chip green">готово</span>
+  {%- elif days < 0 -%}
+    <span class="chip red">просрочено</span>
+  {%- elif days == 0 -%}
+    <span class="chip amber">сегодня</span>
+  {%- elif days == 1 -%}
+    <span class="chip">завтра</span>
+  {%- else -%}
+    <span class="chip grey">{{ when(task.due_on) }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro task_icon(task) -%}
+  {{ "🔍" if task.kind.value == "inspection" else "📌" }}
+{%- endmacro %}
+
+{% macro task_item(task, url, show_assignee=false) %}
+  <a class="item" hx-get="{{ url }}">
+    <span class="icon">{{ task_icon(task) }}</span>
+    <span class="grow">
+      <div class="title">{{ task.title }}</div>
+      <div class="meta">
+        {%- if task.is_open -%}
+          {{ ("%d пункта, пара минут" % CHECKLIST|length) if task.kind.value == "inspection" else (task.description | truncate(48) if task.description else "разовая задача") }}
+        {%- else -%}
+          {{ task.completed_at.astimezone(tz).strftime("%d.%m %H:%M") if task.completed_at }}
+          {%- if task.completed_by %} · {{ task.completed_by.name }}{% endif %}
+        {%- endif -%}
+        {%- if show_assignee and task.is_open %} · {{ task.assignee.name if task.assignee else "любой" }}{% endif -%}
+      </div>
+    </span>
+    {{ due_chip(task) }}
+  </a>
+{% endmacro %}
+
+{% macro check_results(task) %}
+  {% if task.checks %}
+  <div class="results">
+    {% for check in task.checks %}
+      <span class="chip {{ 'green' if check.ok else 'red' }}">{{ "✓" if check.ok else "✕" }} {{ check.label }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro progress(share, done=false) -%}
+  <div class="progress {{ 'done' if done }}"><i style="width: {{ (share * 100) | round(1) }}%"></i></div>
+{%- endmacro %}
+
+{% macro uptime_grid(days) %}
+  <div class="uptime">
+    {% set first = days | first %}
+    {% for _ in range(first.weekday()) %}<span class="pad"></span>{% endfor %}
+    {% for day, share in days.items() %}
+      <span class="{{ share | uptime_level }}" title="{{ day.strftime('%d.%m') }}{% if share is not none %}: {{ share | percent }}{% endif %}"></span>
+    {% endfor %}
+  </div>
+{% endmacro %}

@@ -1,0 +1,37 @@
+{% from "components.html" import task_item with context %}
+{% if back %}<div data-back="{{ back }}"></div>{% endif %}
+<h1>Обслуживание силомеров</h1>
+<p class="subtitle">{{ user.name }}, вот что нужно сделать</p>
+
+{% for machine in broken %}
+  <div class="card alert">
+    <div class="row between">
+      <div>
+        <div style="font-weight:700">🚨 «{{ machine.name }}» не работает</div>
+        <div class="hint">Проверки на паузе, пока силомер не починят</div>
+      </div>
+    </div>
+    <button class="btn secondary" style="margin-top:12px"
+            hx-post="/app/service/machines/{{ machine.id }}/repair-check">
+      🛠 Починил — проверить
+    </button>
+  </div>
+{% endfor %}
+
+<h2>Задачи</h2>
+<div class="list">
+  {% for task in tasks %}
+    {{ task_item(task, "/app/service/tasks/%d" % task.id) }}
+  {% else %}
+    <div class="empty">🎉 Всё сделано</div>
+  {% endfor %}
+</div>
+
+{% if done %}
+  <h2>Недавно сделано</h2>
+  <div class="list">
+    {% for task in done %}
+      {{ task_item(task, "/app/service/tasks/%d" % task.id) }}
+    {% endfor %}
+  </div>
+{% endif %}

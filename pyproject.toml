@@ -1,6 +1,6 @@
 [project]
 name = "vending-ops"
-version = "0.1.0"
+version = "0.2.0"
 description = "Telegram bot and API for running a small strength-tester vending business"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -11,8 +11,10 @@ dependencies = [
     "asyncpg>=0.30",
     "fastapi>=0.115",
     "httpx>=0.28",
+    "jinja2>=3.1",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "python-multipart>=0.0.18",
     "sqlalchemy[asyncio]>=2.0.36",
     "uvicorn[standard]>=0.32",
 ]
@@ -32,6 +34,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+app = ["webapp/templates/**/*.html", "webapp/static/*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -47,6 +52,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.mypy]
 python_version = "3.12"

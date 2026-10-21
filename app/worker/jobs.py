@@ -5,13 +5,16 @@ from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.formatting import render_connection_event
 from app.clock import Clock
 from app.config import Settings
 from app.db import Database
+from app.domain.enums import UserRole
 from app.integrations.smartvend import SmartVendClient
 from app.repositories.telemetry import SyncStateRepository
-from app.services.notifications import Notifier
+from app.services.notifications import Messages, Notifier
+from app.services.rent import RentService
+from app.services.staff import UserService
+from app.services.tasks import TaskService
 from app.services.telemetry import ConnectivitySync, ControllerRegistry, SalesSync
 
 logger = logging.getLogger(__name__)
@@ -48,8 +51,9 @@ class TelemetryJobs:
                 history_start=self.settings.smartvend_history_start,
             )
             await sync.run()
+            admins = await UserService(session).telegram_ids(UserRole.ADMIN)
             for event in await sync.take_unnotified(ALERT_MAX_AGE):
-                await self.notifier.send(render_connection_event(event, self.clock.tz))
+                await self.notifier.send(admins, Messages.connection(event, self.clock.tz))
 
         await self._run(ConnectivitySync.source, job)
 
@@ -91,8 +95,44 @@ class TelemetryJobs:
             state = await SyncStateRepository(session).get(source)
             first_failure = state.last_error is None
             state.last_error = f"{type(exc).__name__}: {exc}"[:1000]
+            admins = await UserService(session).telegram_ids(UserRole.ADMIN)
         if first_failure:
             await self.notifier.send(
+                admins,
                 f"⚠️ Не удалось обновить данные SmartVend ({source}).\n"
-                "Повторю попытку автоматически, подробности в логах."
+                "Повторю попытку автоматически, подробности в логах.",
             )
+
+
+class ServiceJobs:
+    """Keeps the weekly inspections going and sends the two reminders before each due date."""
+
+    def __init__(self, db: Database, notifier: Notifier, clock: Clock) -> None:
+        self.db = db
+        self.notifier = notifier
+        self.clock = clock
+
+    async def schedule_inspections(self) -> None:
+        async with self.db.session() as session:
+            created = await TaskService(session, self.clock).schedule_inspections()
+        if created:
+            logger.info("Scheduled %d inspections", len(created))
+
+    async def send_reminders(self) -> None:
+        today = self.clock.today()
+        async with self.db.session() as session:
+            users = UserService(session)
+            workers = await users.telegram_ids(UserRole.WORKER)
+            admins = await users.telegram_ids(UserRole.ADMIN)
+
+            for task in await TaskService(session, self.clock).due_reminders():
+                recipients = [task.assignee.telegram_id] if task.assignee else workers
+                days_left = (task.due_on - today).days
+                await self.notifier.send(recipients, Messages.task_reminder(task, days_left))
+                task.reminded_on = today
+
+            rent = RentService(session, self.clock)
+            await rent.sync_accruals()
+            for payment in await rent.due_reminders():
+                await self.notifier.send(admins, Messages.rent_reminder(payment))
+                payment.reminded_on = today

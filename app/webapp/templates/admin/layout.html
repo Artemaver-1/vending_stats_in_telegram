@@ -1,0 +1,18 @@
+{% if back %}<div data-back="{{ back }}"></div>{% endif %}
+{% block content %}{% endblock %}
+
+{% set tabs = [
+  ("home", "/app/admin", "🏠", "Главная"),
+  ("tasks", "/app/admin/tasks", "📋", "Задачи"),
+  ("purchases", "/app/admin/purchases", "🛒", "Заявки"),
+  ("money", "/app/admin/economics", "📈", "Экономика"),
+  ("rent", "/app/admin/rent", "🏢", "Аренда"),
+] %}
+<nav class="tabbar">
+  {% for key, url, icon, label in tabs %}
+    <a hx-get="{{ url }}" class="{{ 'active' if tab == key }}">
+      <b>{{ icon }}</b>{{ label }}
+      {% if key == "purchases" and new_purchases %}<span class="badge">{{ new_purchases }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</nav>

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, str_enum
 from app.db.models.location import Location
 from app.domain.enums import RentType
+from app.domain.periods import next_month
 
 
 class RentContract(TimestampMixin, Base):
@@ -46,9 +47,15 @@ class RentPayment(TimestampMixin, Base):
     period: Mapped[date]
     amount: Mapped[Decimal]
     paid_on: Mapped[date | None]
+    reminded_on: Mapped[date | None]
 
     contract: Mapped[RentContract] = relationship(back_populates="payments")
 
     @property
     def is_paid(self) -> bool:
         return self.paid_on is not None
+
+    @property
+    def due_on(self) -> date:
+        """Rent for a month is paid on the contract's payment day of the following month."""
+        return next_month(self.period).replace(day=self.contract.payment_day)

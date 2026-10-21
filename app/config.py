@@ -12,7 +12,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     bot_token: SecretStr
-    allowed_user_ids: Annotated[frozenset[int], NoDecode] = Field(default_factory=frozenset)
+    # Owners of the business; everyone else is let in from the admin panel.
+    admin_ids: Annotated[frozenset[int], NoDecode] = Field(default_factory=frozenset)
+
+    # Public HTTPS address of the Mini App. Without it the bot asks the Cloudflare tunnel.
+    webapp_url: str | None = None
+    tunnel_metrics_url: str = "http://tunnel:2000"
+    # Exposes /docs; keep off when the API is reachable through the tunnel.
+    api_docs: bool = False
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -32,7 +39,7 @@ class Settings(BaseSettings):
 
     default_machine_cost: Decimal = Decimal("320000")
 
-    @field_validator("allowed_user_ids", mode="before")
+    @field_validator("admin_ids", mode="before")
     @classmethod
     def _split_ids(cls, value: object) -> object:
         if isinstance(value, str):
@@ -40,6 +47,11 @@ class Settings(BaseSettings):
         if isinstance(value, int):
             return frozenset({value})
         return value
+
+    @field_validator("webapp_url", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: object) -> object:
+        return value or None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

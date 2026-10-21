@@ -1,13 +1,27 @@
 # Vending Ops
 
-Telegram bot and REST API for running a small vending business: two strength-tester
-machines in Chelyabinsk. Sales and connectivity are pulled from SmartVend telemetry,
-with rent tracking, monthly P&L, payback, uptime history and a lightweight CRM for
-new locations.
+Telegram Mini App for running a small vending business: two strength-tester machines in
+Chelyabinsk. Sales and connectivity are pulled from SmartVend telemetry; the owner gets an
+admin panel with P&L, payback, rent schedule and uptime, the service crew gets a dead-simple
+task list with weekly inspection checklists.
+
+## Roles
+
+- **Admin** — dashboard, tasks for the crew (with a QR code or file attached), purchase
+  requests coming from inspections, economics per month and per machine, rent contracts
+  with accruals and payment marks, machine status and uptime, team access.
+- **Service** — "Обслуживание силомеров": open tasks, a four-question inspection with big
+  yes/no buttons and a "what to order" field. If the machine as a whole doesn't work it is
+  marked broken, the admin is alerted and weekly inspections pause until a repair check
+  passes. Reminders arrive two days and one day before a task is due.
+
+Everyone who opens the bot is recorded as an access request; admins (from `ADMIN_IDS`)
+let people in from the Team screen.
 
 ## Stack
 
 - Python 3.12, aiogram 3, FastAPI
+- Mini App: server-rendered Jinja2 + htmx, Telegram theme colours, SVG charts drawn in Python
 - PostgreSQL 16, SQLAlchemy 2 (async), Alembic
 - Docker Compose
 
@@ -21,8 +35,9 @@ app/
   services/      use cases shared by the bot and the API
   integrations/  external API clients (SmartVend)
   worker/        scheduled sync jobs and alerts
-  bot/           aiogram handlers, keyboards, middlewares
-  api/           FastAPI routes
+  bot/           aiogram: access requests, menu button, notifications
+  webapp/        Mini App: init-data auth, templates, admin and service screens
+  api/           FastAPI app factory and JSON routes
 migrations/      Alembic revisions
 tests/
 ```
@@ -30,7 +45,7 @@ tests/
 ## Running
 
 ```bash
-cp .env.example .env   # fill in BOT_TOKEN and ALLOWED_USER_IDS
+cp .env.example .env   # fill in BOT_TOKEN, ADMIN_IDS and SMARTVEND_API_KEY
 docker compose up -d --build
 ```
 
@@ -41,8 +56,16 @@ API docs are at <http://localhost:8000/docs>.
 |----------|---------------------------------------------------------------------|
 | `bot`    | Telegram bot, long polling                                          |
 | `worker` | syncs SmartVend every 5 min (connectivity) and 30 min (sales)       |
-| `api`    | FastAPI, bound to localhost                                         |
+| `api`    | FastAPI: Mini App and JSON API                                      |
+| `tunnel` | Cloudflare quick tunnel giving the Mini App a public HTTPS address  |
 | `db`     | PostgreSQL 16                                                       |
+
+Telegram only opens Mini Apps over HTTPS. The quick tunnel needs no account or domain but
+gets a new address on every restart; the bot reads it from the tunnel's metrics endpoint
+and re-points everyone's menu button. Set `WEBAPP_URL` to use a fixed address instead.
+
+Every screen checks the Telegram-signed init data sent by `app.js`; images such as QR codes
+use short-lived signed links because the browser loads them without headers.
 
 ## Running on a machine that isn't always on
 

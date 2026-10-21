@@ -39,4 +39,11 @@ class Machine(TimestampMixin, Base):
     is_online: Mapped[bool | None]
     status_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Set when an inspection finds the whole machine down; cleared by a passing check.
+    broken_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     location: Mapped[Location | None] = relationship(back_populates="machines")
+
+    @property
+    def is_broken(self) -> bool:
+        return self.broken_since is not None

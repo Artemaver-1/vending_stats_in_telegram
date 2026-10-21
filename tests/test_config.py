@@ -11,13 +11,11 @@ from app.config import Settings
         ("", set()),
     ],
 )
-def test_allowed_ids_from_env(
-    monkeypatch: pytest.MonkeyPatch, raw: str, expected: set[int]
-) -> None:
+def test_admin_ids_from_env(monkeypatch: pytest.MonkeyPatch, raw: str, expected: set[int]) -> None:
     monkeypatch.setenv("BOT_TOKEN", "123:abc")
-    monkeypatch.setenv("ALLOWED_USER_IDS", raw)
+    monkeypatch.setenv("ADMIN_IDS", raw)
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert settings.allowed_user_ids == expected
+    assert settings.admin_ids == expected
 
 
 def test_database_url(monkeypatch: pytest.MonkeyPatch) -> None:

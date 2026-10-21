@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 
 from aiogram import Bot, Dispatcher
@@ -8,26 +9,43 @@ from aiogram.types import BotCommand
 
 from app.bot.handlers import build_router
 from app.bot.middlewares import AccessMiddleware, DatabaseMiddleware
-from app.clock import Clock
+from app.bot.webapp_link import WebAppLink
 from app.config import Settings, get_settings
 from app.db import Database
+from app.services.notifications import TelegramNotifier
+from app.services.staff import UserService
 
 logger = logging.getLogger(__name__)
 
-COMMANDS = [
-    BotCommand(command="month", description="Финансы за месяц"),
-    BotCommand(command="payback", description="Окупаемость"),
-    BotCommand(command="machines", description="Связь с аппаратами"),
-    BotCommand(command="help", description="Что умеет бот"),
-]
+COMMANDS = [BotCommand(command="app", description="Открыть приложение")]
+LINK_CHECK_SECONDS = 120
 
 
-def build_dispatcher(settings: Settings, db: Database) -> Dispatcher:
-    dp = Dispatcher(clock=Clock(settings.tz))
-    dp.update.outer_middleware(AccessMiddleware(settings.allowed_user_ids))
+def build_dispatcher(bot: Bot, db: Database, webapp: WebAppLink) -> Dispatcher:
+    dp = Dispatcher(webapp=webapp)
     dp.update.outer_middleware(DatabaseMiddleware(db))
+    dp.update.outer_middleware(AccessMiddleware(TelegramNotifier(bot)))
     dp.include_router(build_router())
     return dp
+
+
+async def keep_menu_buttons_fresh(bot: Bot, db: Database, webapp: WebAppLink) -> None:
+    """The quick tunnel gets a new address on every restart; follow it."""
+    while True:
+        if await webapp.refresh():
+            logger.info("Mini App is now at %s", webapp.url)
+            async with db.session() as session:
+                users = [u for u in await UserService(session).list_all() if u.is_active]
+            await webapp.apply(bot, users)
+        # Until the tunnel reports its address, ask often so /start works soon after boot.
+        await asyncio.sleep(LINK_CHECK_SECONDS if webapp.url else 5)
+
+
+async def bootstrap_admins(db: Database, settings: Settings) -> None:
+    if not settings.admin_ids:
+        logger.warning("ADMIN_IDS is empty, nobody can let people into the bot")
+    async with db.session() as session:
+        await UserService(session).ensure_admins(settings.admin_ids)
 
 
 async def main() -> None:
@@ -36,16 +54,17 @@ async def main() -> None:
         level=settings.log_level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    if not settings.allowed_user_ids:
-        logger.warning("ALLOWED_USER_IDS is empty, nobody will be able to use the bot")
 
     db = Database(settings.database_url)
     bot = Bot(
         settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dp = build_dispatcher(settings, db)
+    webapp = WebAppLink(settings.webapp_url, settings.tunnel_metrics_url)
+    dp = build_dispatcher(bot, db, webapp)
+    await bootstrap_admins(db, settings)
 
+    link_task = asyncio.create_task(keep_menu_buttons_fresh(bot, db, webapp))
     try:
         await bot.set_my_commands(COMMANDS)
         # Updates sent while the machine was off are kept by Telegram for 24 hours;
@@ -53,6 +72,9 @@ async def main() -> None:
         await bot.delete_webhook(drop_pending_updates=False)
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        link_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await link_task
         await bot.session.close()
         await db.dispose()
 

@@ -97,12 +97,13 @@ class FinanceService:
         contracts = await self.contracts.active_between(start, end, location_ids)
         rent_by_location: dict[int, Decimal] = defaultdict(lambda: ZERO)
         for contract in contracts:
-            rent_by_location[contract.location_id] += await self._contract_charge(
-                contract, start, end
-            )
+            rent_by_location[contract.location_id] += await self.rent_charge(contract, start)
         return sum(rent_by_location.values(), ZERO)
 
-    async def _contract_charge(self, contract: RentContract, start: date, end: date) -> Decimal:
+    async def rent_charge(self, contract: RentContract, period: date) -> Decimal:
+        """What the contract costs for the month containing `period`."""
+        start = month_start(period)
+        end = next_month(start)
         terms = RentTerms(
             rent_type=contract.rent_type,
             fixed_amount=contract.fixed_amount,

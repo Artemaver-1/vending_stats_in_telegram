@@ -1,0 +1,77 @@
+from datetime import date
+from decimal import Decimal
+
+from app.domain.enums import ExpenseCategory, PaymentChannel, PurchaseStatus
+
+MONTHS = (
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+)  # fmt: skip
+MONTHS_GENITIVE = (
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+)  # fmt: skip
+MONTHS_SHORT = (
+    "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
+)  # fmt: skip
+WEEKDAYS = ("пн", "вт", "ср", "чт", "пт", "сб", "вс")
+
+CHANNEL_LABELS = {
+    PaymentChannel.CARD: "Карты",
+    PaymentChannel.COIN: "Монеты",
+    PaymentChannel.BILL: "Купюры",
+}
+
+EXPENSE_LABELS = {
+    ExpenseCategory.PARTS: "Комплектующие",
+    ExpenseCategory.REPAIR: "Ремонт",
+    ExpenseCategory.ACQUIRING_FEE: "Эквайринг",
+    ExpenseCategory.CONNECTIVITY: "Связь",
+    ExpenseCategory.TRANSPORT: "Транспорт",
+    ExpenseCategory.OTHER: "Прочее",
+}
+
+PURCHASE_LABELS = {
+    PurchaseStatus.NEW: "Новая",
+    PurchaseStatus.ORDERED: "Заказано",
+    PurchaseStatus.DONE: "Готово",
+}
+
+
+def rub(value: Decimal | int) -> str:
+    value = Decimal(value)
+    sign = "−" if value < 0 else ""
+    value = abs(value)
+    text = f"{value:,.0f}" if value == value.to_integral_value() else f"{value:,.2f}"
+    return f"{sign}{text.replace(',', ' ').replace('.', ',')} ₽"
+
+
+def month_title(period: date) -> str:
+    return f"{MONTHS[period.month - 1].capitalize()} {period.year}"
+
+
+def human_date(day: date, today: date | None = None) -> str:
+    if today is not None:
+        delta = (day - today).days
+        if delta == 0:
+            return "сегодня"
+        if delta == 1:
+            return "завтра"
+        if delta == -1:
+            return "вчера"
+    text = f"{day.day} {MONTHS_GENITIVE[day.month - 1]}"
+    if today is not None and day.year != today.year:
+        text += f" {day.year}"
+    return text
+
+
+def uptime_level(share: float | None) -> str:
+    if share is None:
+        return "none"
+    if share >= 0.95:
+        return "full"
+    if share >= 0.5:
+        return "most"
+    if share > 0:
+        return "some"
+    return "off"

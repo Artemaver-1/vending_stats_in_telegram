@@ -1,0 +1,69 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+<h1>Аренда</h1>
+
+{% if upcoming %}
+<h2>Текущий месяц</h2>
+<div class="list">
+  {% for u in upcoming %}
+    <div class="item">
+      <span class="icon">🗓</span>
+      <span class="grow">
+        <div class="title">{{ u.contract.location.name }}</div>
+        <div class="meta">{{ u.period | month_title }} · оплатить до {{ when(u.due_on) }}{% if u.contract.rent_type.value == "percent" %} · {{ u.contract.revenue_percent | float | round(1) }}% от выручки{% endif %}</div>
+      </span>
+      <span class="right"><div style="font-weight:600">≈ {{ u.estimate | rub }}</div><div class="hint">пока идёт месяц</div></span>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if chart %}
+<h2>Платежи по месяцам</h2>
+<div class="card">{{ chart }}</div>
+{% endif %}
+
+<h2>Начисления</h2>
+<div class="list">
+  {% for p in payments %}
+    {% set overdue = not p.is_paid and p.due_on < today %}
+    <div class="item">
+      <span class="icon">{{ "✅" if p.is_paid else ("⚠️" if overdue else "💳") }}</span>
+      <span class="grow">
+        <div class="title">{{ p.contract.location.name }} · {{ p.period | month_title }}</div>
+        <div class="meta">
+          {% if p.is_paid %}оплачено {{ p.paid_on.strftime("%d.%m.%Y") }}
+          {% else %}<span class="{{ 'danger' if overdue }}">оплатить до {{ when(p.due_on) }}</span>{% endif %}
+        </div>
+      </span>
+      <span class="right">
+        <div style="font-weight:600">{{ p.amount | rub }}</div>
+        <button class="btn small {{ 'secondary' if not p.is_paid else '' }}" style="margin-top:4px; {{ 'background:none;color:var(--hint);padding:2px 0' if p.is_paid }}"
+                hx-post="/app/admin/rent/payments/{{ p.id }}/{{ 'unpaid' if p.is_paid else 'paid' }}">
+          {{ "отменить" if p.is_paid else "Оплачено" }}
+        </button>
+      </span>
+    </div>
+  {% else %}
+    <div class="empty">Начислений нет — добавьте договор ниже</div>
+  {% endfor %}
+</div>
+
+<h2>Договоры</h2>
+<div class="list">
+  {% for c in contracts %}
+    <a class="item" hx-get="/app/admin/rent/contracts/{{ c.id }}">
+      <span class="icon">📄</span>
+      <span class="grow">
+        <div class="title">{{ c.location.name }}</div>
+        <div class="meta">
+          {% if c.rent_type.value == "fixed" %}{{ c.fixed_amount | rub }} в месяц{% else %}{{ c.revenue_percent | float | round(1) }}% от выручки{% endif %}
+          · {{ c.payment_day }} числа · с {{ c.valid_from.strftime("%d.%m.%Y") }}{% if c.valid_to %} по {{ c.valid_to.strftime("%d.%m.%Y") }}{% endif %}
+        </div>
+      </span>
+      <span class="chev"></span>
+    </a>
+  {% endfor %}
+  <a class="item" hx-get="/app/admin/rent/contracts/new"><span class="icon">＋</span><span class="grow title" style="color:var(--link)">Добавить договор</span></a>
+</div>
+{% endblock %}

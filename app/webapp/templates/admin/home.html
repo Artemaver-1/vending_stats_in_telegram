@@ -1,0 +1,78 @@
+{% extends "admin/layout.html" %}
+{% from "components.html" import progress, task_item with context %}
+{% block content %}
+<h1>Силомеры</h1>
+<p class="subtitle">{{ today.day }} {{ month_name }} · {{ today | weekday }}</p>
+
+<div class="kpis">
+  <div class="kpi">
+    <div class="label">Выручка за {{ pnl.period | month_short }}</div>
+    <div class="value">{{ pnl.total_revenue | rub }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Прибыль за {{ pnl.period | month_short }}</div>
+    <div class="value {{ 'neg' if pnl.net_profit < 0 }}">{{ pnl.net_profit | rub }}</div>
+  </div>
+  <a class="kpi wide" hx-get="/app/admin/economics" style="color:inherit">
+    <div class="row between">
+      <span class="label">Окупаемость бизнеса</span>
+      <span class="chip {{ 'green' if payback.reached_in }}">{{ payback.progress | percent }}</span>
+    </div>
+    {{ progress(payback.progress, payback.reached_in is not none) }}
+    <div class="hint">Заработано {{ payback.earned | rub }} из {{ payback.investment | rub }}</div>
+  </a>
+</div>
+
+<h2>Аппараты</h2>
+<div class="list">
+  {% for m in machines %}
+    <a class="item" hx-get="/app/admin/machines">
+      <span class="icon">{{ "🚨" if m.machine.is_broken else ("🟢" if m.machine.is_online else "🔴") }}</span>
+      <span class="grow">
+        <div class="title">{{ m.machine.name }}</div>
+        <div class="meta">
+          {% if m.machine.is_broken %}сломан{% elif m.machine.is_online %}на связи{% elif m.machine.is_online is none %}статус неизвестен{% else %}нет связи{% endif %}
+          · проверка {{ when(m.last_check) if m.last_check else "не было" }}
+        </div>
+      </span>
+      <span class="right">
+        <div style="font-weight:600">{{ m.revenue | rub }}</div>
+        <div class="hint">за месяц</div>
+      </span>
+    </a>
+  {% endfor %}
+</div>
+
+{% if overdue or new_purchases or rent_due %}
+<h2>Требует внимания</h2>
+<div class="list">
+  {% if new_purchases %}
+    <a class="item" hx-get="/app/admin/purchases">
+      <span class="icon">🛒</span>
+      <span class="grow"><div class="title">Новые заявки на закупку</div></span>
+      <span class="chip red">{{ new_purchases }}</span>
+    </a>
+  {% endif %}
+  {% for task in overdue %}
+    {{ task_item(task, "/app/admin/tasks/%d" % task.id, show_assignee=true) }}
+  {% endfor %}
+  {% for p in rent_due %}
+    <a class="item" hx-get="/app/admin/rent">
+      <span class="icon">💳</span>
+      <span class="grow">
+        <div class="title">Аренда «{{ p.contract.location.name }}»</div>
+        <div class="meta">{{ p.period | month_title }} · до {{ when(p.due_on) }}</div>
+      </span>
+      <span style="font-weight:600">{{ p.amount | rub }}</span>
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2>Разделы</h2>
+<div class="list">
+  <a class="item" hx-get="/app/admin/machines"><span class="icon">📡</span><span class="grow title">Аппараты и связь</span><span class="chev"></span></a>
+  <a class="item" hx-get="/app/admin/team"><span class="icon">👥</span><span class="grow title">Команда</span>{% if pending_users %}<span class="chip red">{{ pending_users }}</span>{% endif %}<span class="chev"></span></a>
+  <a class="item" hx-get="/app/service"><span class="icon">🔧</span><span class="grow title">Открыть обслуживание</span><span class="chev"></span></a>
+</div>
+{% endblock %}

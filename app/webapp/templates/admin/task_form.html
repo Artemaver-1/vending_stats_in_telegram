@@ -1,0 +1,40 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+<h1>Новая задача</h1>
+
+<form hx-post="/app/admin/tasks" hx-encoding="multipart/form-data">
+  <label class="field">
+    <span>Что сделать</span>
+    <input name="title" required maxlength="200" placeholder="Получить датчик в СДЭК">
+  </label>
+  <label class="field">
+    <span>Подробности</span>
+    <textarea name="description" placeholder="Адрес пункта, номер заказа, что проверить"></textarea>
+  </label>
+  <div class="two">
+    <label class="field">
+      <span>Когда</span>
+      <input type="date" name="due_on" required value="{{ today.isoformat() }}" min="{{ today.isoformat() }}">
+    </label>
+    <label class="field">
+      <span>Силомер</span>
+      <select name="machine_id">
+        <option value="">—</option>
+        {% for m in machines %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <label class="field">
+    <span>Кому</span>
+    <select name="assignee_id">
+      <option value="">Любому из команды</option>
+      {% for u in workers %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="field">
+    <span>QR-код или файл</span>
+    <input type="file" name="attachment" accept="image/*,application/pdf">
+  </label>
+  <button class="btn" type="submit">Поставить задачу</button>
+</form>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+<h1>Команда</h1>
+<p class="subtitle">Новый человек появится здесь, когда откроет бота</p>
+
+{% set pending = users | rejectattr("is_active") | list %}
+{% if pending %}
+<h2>Просят доступ</h2>
+<div class="list">
+  {% for u in pending %}
+    <div class="item">
+      <span class="icon">👤</span>
+      <span class="grow">
+        <div class="title">{{ u.name }}</div>
+        <div class="meta">{% if u.username %}@{{ u.username }} · {% endif %}ID {{ u.telegram_id }}</div>
+      </span>
+      <button class="btn small" hx-post="/app/admin/team/{{ u.id }}/allow">Открыть доступ</button>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2>В команде</h2>
+<div class="list">
+  {% for u in users if u.is_active %}
+    <div class="item">
+      <span class="icon">{{ "👑" if u.is_admin else "🔧" }}</span>
+      <span class="grow">
+        <div class="title">{{ u.name }}</div>
+        <div class="meta">{{ "администратор" if u.is_admin else "обслуживание" }}{% if u.username %} · @{{ u.username }}{% endif %}</div>
+      </span>
+      {% if not u.is_admin %}
+        <button class="btn small danger" hx-post="/app/admin/team/{{ u.id }}/revoke" hx-confirm="Закрыть доступ для {{ u.name }}?">Убрать</button>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

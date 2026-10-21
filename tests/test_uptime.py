@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.bot.formatting import render_uptime_grid
 from app.domain.uptime import Transition, daily_uptime
 
 TZ = ZoneInfo("Asia/Yekaterinburg")
@@ -61,11 +60,3 @@ def test_duplicate_events_do_not_break_intervals() -> None:
     ]
     uptime = daily_uptime(transitions, date(2026, 10, 10), date(2026, 10, 10), tz=TZ, now=at(11, 0))
     assert uptime[date(2026, 10, 10)] == pytest.approx(0.5)
-
-
-def test_grid_starts_on_monday() -> None:
-    # 2026-10-21 is a Wednesday: two blank cells, then three days.
-    grid = render_uptime_grid(
-        {date(2026, 10, 21): 1.0, date(2026, 10, 22): 0.0, date(2026, 10, 23): None}
-    )
-    assert grid == "   " * 2 + "🟩 🟥 ⬜"

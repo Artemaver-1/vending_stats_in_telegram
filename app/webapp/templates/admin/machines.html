@@ -1,0 +1,46 @@
+{% extends "admin/layout.html" %}
+{% from "components.html" import uptime_grid, check_results with context %}
+{% block content %}
+<h1>Аппараты</h1>
+
+{% for m in machines %}
+  {% set machine = m.machine %}
+  <div class="card {{ 'alert' if machine.is_broken }}">
+    <div class="row between">
+      <b style="font-size:17px">{{ machine.name }}</b>
+      {% if machine.is_broken %}<span class="chip red">сломан</span>
+      {% elif machine.is_online %}<span class="chip green">на связи</span>
+      {% elif machine.is_online is none %}<span class="chip grey">нет данных</span>
+      {% else %}<span class="chip red">нет связи</span>{% endif %}
+    </div>
+    <div class="hint" style="margin-top:4px">
+      {% if machine.launched_on %}запущен {{ machine.launched_on.strftime("%d.%m.%Y") }} · {% endif %}
+      стоимость {{ machine.purchase_cost | rub }}
+      {% if machine.status_checked_at %}· связь проверена {{ machine.status_checked_at.astimezone(tz).strftime("%d.%m %H:%M") }}{% endif %}
+    </div>
+
+    <div class="row between" style="margin-top:12px">
+      <span class="hint">Связь за 4 недели</span>
+      <b>{{ m.average | percent if m.average is not none else "—" }}</b>
+    </div>
+    {{ uptime_grid(m.uptime) }}
+
+    <div style="margin-top:14px">
+      <div class="hint">Последняя проверка</div>
+      {% if m.last_check %}
+        <div>{{ m.last_check.completed_at.astimezone(tz).strftime("%d.%m.%Y") }}{% if m.last_check.completed_by %} · {{ m.last_check.completed_by.name }}{% endif %}</div>
+        {{ check_results(m.last_check) }}
+      {% else %}<div>ещё не было</div>{% endif %}
+    </div>
+
+    <button class="btn small {{ 'secondary' if machine.is_broken else 'danger' }}" style="margin-top:12px"
+            hx-post="/app/admin/machines/{{ machine.id }}/{{ 'fixed' if machine.is_broken else 'broken' }}"
+            hx-confirm="{{ 'Отметить, что силомер снова работает?' if machine.is_broken else 'Отметить силомер сломанным? Проверки встанут на паузу.' }}">
+      {{ "🛠 Отметить рабочим" if machine.is_broken else "🚨 Отметить сломанным" }}
+    </button>
+  </div>
+{% endfor %}
+<div class="legend" style="margin:0 6px">
+  <span><i style="background:var(--ok)"></i>весь день</span><span><i style="background:var(--warn)"></i>с перебоями</span><span><i style="background:var(--danger)"></i>офлайн</span>
+</div>
+{% endblock %}

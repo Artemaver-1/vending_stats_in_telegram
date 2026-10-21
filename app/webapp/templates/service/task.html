@@ -1,0 +1,36 @@
+{% from "components.html" import due_chip, check_results with context %}
+<div data-back="/app/service"></div>
+<h1>{{ task.title }}</h1>
+<p class="subtitle">{{ due_chip(task) }}{% if task.machine %} · {{ task.machine.name }}{% endif %}</p>
+
+{% if task.description %}
+  <div class="card"><p style="white-space: pre-wrap; margin: 0">{{ task.description }}</p></div>
+{% endif %}
+
+{% if task.attachment %}
+  <div class="card">
+    {% set url = signer.sign("/app/attachments/%d" % task.attachment.id) %}
+    {% if task.attachment.content_type.startswith("image/") %}
+      <img class="qr" src="{{ url }}" alt="{{ task.attachment.filename }}">
+      <p class="hint" style="text-align:center">Покажите этот код при получении</p>
+    {% else %}
+      <a class="btn secondary" href="{{ url }}" target="_blank">📎 {{ task.attachment.filename }}</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if task.is_open %}
+  <form hx-post="/app/service/tasks/{{ task.id }}/done">
+    <label class="field">
+      <span>Комментарий (если нужно)</span>
+      <textarea name="comment" placeholder="Например: поставил, всё работает"></textarea>
+    </label>
+    <button class="btn" type="submit">✅ Сделал</button>
+  </form>
+{% else %}
+  <div class="card">
+    <div class="ok" style="font-weight:700">✅ Выполнено {{ task.completed_at.astimezone(tz).strftime("%d.%m в %H:%M") }}</div>
+    {% if task.comment %}<p class="hint" style="margin-top:6px">{{ task.comment }}</p>{% endif %}
+    {{ check_results(task) }}
+  </div>
+{% endif %}

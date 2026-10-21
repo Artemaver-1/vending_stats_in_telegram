@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Силомеры</title>
+  <meta name="htmx-config" content='{"historyEnabled": false}'>
+  <link rel="stylesheet" href="/static/app.css?v={{ version }}">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+</head>
+<body hx-target="#view">
+  <main id="view"><div class="loader">Загрузка…</div></main>
+  <div id="toast"></div>
+  <script src="/static/app.js?v={{ version }}"></script>
+</body>
+</html>

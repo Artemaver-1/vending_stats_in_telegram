@@ -1,0 +1,20 @@
+{% extends "admin/layout.html" %}
+{% from "components.html" import task_item, check_results with context %}
+{% block content %}
+<h1>Задачи</h1>
+
+<button class="btn" hx-get="/app/admin/tasks/new" style="margin-bottom:14px">＋ Новая задача</button>
+
+<div class="segmented">
+  <a hx-get="/app/admin/tasks" class="{{ 'active' if view == 'open' }}">Активные</a>
+  <a hx-get="/app/admin/tasks?view=done" class="{{ 'active' if view == 'done' }}">Выполненные</a>
+</div>
+
+<div class="list">
+  {% for task in tasks %}
+    {{ task_item(task, "/app/admin/tasks/%d" % task.id, show_assignee=true) }}
+  {% else %}
+    <div class="empty">{{ "Активных задач нет" if view == "open" else "Пока ничего не выполнено" }}</div>
+  {% endfor %}
+</div>
+{% endblock %}

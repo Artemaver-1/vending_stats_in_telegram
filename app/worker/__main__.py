@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.db import Database
 from app.integrations.smartvend import SmartVendClient
 from app.services.notifications import TelegramNotifier
-from app.worker.jobs import TelemetryJobs
+from app.worker.jobs import ServiceJobs, TelemetryJobs
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +35,21 @@ async def main() -> None:
     client = SmartVendClient(
         settings.smartvend_api_key.get_secret_value(), settings.smartvend_base_url
     )
-    jobs = TelemetryJobs(
-        settings, db, client, TelegramNotifier(bot, settings.allowed_user_ids), clock
-    )
+    notifier = TelegramNotifier(bot)
+    jobs = TelemetryJobs(settings, db, client, notifier, clock)
+    service = ServiceJobs(db, notifier, clock)
 
     # Both jobs also fire right away, so a host that was switched off catches up on boot.
     scheduler = AsyncIOScheduler(timezone=settings.tz)
     job_defaults = {"max_instances": 1, "coalesce": True, "next_run_time": clock.now()}
     scheduler.add_job(jobs.sync_connectivity, "interval", minutes=5, **job_defaults)
     scheduler.add_job(jobs.sync_sales, "interval", minutes=30, **job_defaults)
+    scheduler.add_job(service.schedule_inspections, "interval", hours=1, **job_defaults)
+    # Reminders go out once a day; checking hourly from 10 to 21 still catches days
+    # when the computer is switched on late.
+    scheduler.add_job(
+        service.send_reminders, "cron", hour="10-21", minute=5, max_instances=1, coalesce=True
+    )
     scheduler.start()
     logger.info("Worker started")
 
