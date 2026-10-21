@@ -72,3 +72,17 @@ async def test_unused_method_and_idle_machine_are_left_alone(session: AsyncSessi
     await add_sales(session, other, ["coin", "card"] * 10, NOW - timedelta(days=5))
     await add_sales(session, other, ["card"] * 5, NOW)
     assert (await PaymentWatch(session, FixedClock(NOW)).run()).raised == []
+
+
+async def test_late_smartvend_data_still_counts(session: AsyncSession) -> None:
+    pushkina = await machine(session)
+    # The last sales SmartVend delivered are three days old and had no coins.
+    stopped = NOW - timedelta(days=3)
+    await add_sales(session, pushkina, ["coin", "card", "bill"] * 10, stopped - timedelta(days=7))
+    await add_sales(session, pushkina, ["card", "bill"] * 15, stopped)
+    raised = (await PaymentWatch(session, FixedClock(NOW)).run()).raised
+    assert [a.channel for a in raised] == [PaymentChannel.COIN]
+
+    # Ten days without any sales is downtime, not a payment problem.
+    much_later = PaymentWatch(session, FixedClock(NOW + timedelta(days=8)))
+    assert (await much_later.run()).raised == []

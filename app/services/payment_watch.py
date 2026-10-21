@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,10 @@ MIN_SALES = 10
 # Methods a machine's customers simply don't use aren't worth an alert.
 USED_LOOKBACK = timedelta(days=60)
 MIN_PAST_USES = 10
+# The two days are counted back from the machine's latest known sale, so a delay in
+# SmartVend's data doesn't hide a broken acceptor. A machine that hasn't sold for longer
+# than this is standing idle, which the downtime banner already covers.
+IDLE_AFTER = timedelta(days=7)
 
 
 @dataclass(slots=True)
@@ -33,7 +37,7 @@ class WatchResult:
 
 class PaymentWatch:
     """Notices a payment method nobody has paid with for two days while the machine
-    keeps selling by other methods, and clears it once payments come through again."""
+    kept selling by other methods, and clears it once payments come through again."""
 
     def __init__(self, session: AsyncSession, clock: Clock) -> None:
         self.session = session
@@ -54,10 +58,14 @@ class PaymentWatch:
         now = self.clock.now()
         machines = await self.session.scalars(select(Machine).where(Machine.is_active))
         for machine in machines:
-            recent = await self._count(machine, now - QUIET_PERIOD)
+            latest = await self._latest_sale(machine)
+            if latest is None or now - latest > IDLE_AFTER:
+                continue
+            since = latest - QUIET_PERIOD
+            recent = await self._count(machine, since)
             for channel in PaymentChannel:
                 alert = open_alerts.get((machine.id, channel))
-                hits = await self._count(machine, now - QUIET_PERIOD, channel)
+                hits = await self._count(machine, since, channel)
                 if alert is not None:
                     if hits > allowed_hits(recent):
                         alert.resolved_at = now
@@ -67,7 +75,7 @@ class PaymentWatch:
                     continue
                 if machine.is_broken or recent < MIN_SALES or hits > allowed_hits(recent):
                     continue
-                if await self._count(machine, now - USED_LOOKBACK, channel) < MIN_PAST_USES:
+                if await self._count(machine, latest - USED_LOOKBACK, channel) < MIN_PAST_USES:
                     continue
                 alert = PaymentAlert(
                     machine_id=machine.id,
@@ -82,8 +90,15 @@ class PaymentWatch:
         await self.session.flush()
         return result
 
+    async def _latest_sale(self, machine: Machine) -> datetime | None:
+        return await self.session.scalar(
+            select(func.max(TelemetrySale.sold_at)).where(
+                TelemetrySale.machine_id == machine.id, TelemetrySale.canceled.is_(False)
+            )
+        )
+
     async def _count(
-        self, machine: Machine, since: object, channel: PaymentChannel | None = None
+        self, machine: Machine, since: datetime, channel: PaymentChannel | None = None
     ) -> int:
         conditions = [
             TelemetrySale.machine_id == machine.id,
