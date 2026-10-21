@@ -1,0 +1,53 @@
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    POSTGRES_HOST: db
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vending}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vending}
+      POSTGRES_DB: ${POSTGRES_DB:-vending}
+      TZ: ${TIMEZONE:-Asia/Yekaterinburg}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  bot:
+    <<: *app
+    command: ["python", "-m", "app.bot"]
+
+  api:
+    <<: *app
+    command: ["uvicorn", "app.api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  pgdata:
