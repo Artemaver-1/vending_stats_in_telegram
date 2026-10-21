@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Machine, TelemetrySale
 from app.domain.enums import PaymentChannel
-from app.services.payment_watch import PaymentWatch, allowed_hits
+from app.formatting import span
+from app.services.payment_watch import PaymentWatch, allowed_hits, quiet_period
 from tests.helpers import TZ, FixedClock
 
 NOW = datetime(2026, 10, 21, 12, tzinfo=TZ)
@@ -86,3 +87,27 @@ async def test_late_smartvend_data_still_counts(session: AsyncSession) -> None:
     # Ten days without any sales is downtime, not a payment problem.
     much_later = PaymentWatch(session, FixedClock(NOW + timedelta(days=8)))
     assert (await much_later.run()).raised == []
+
+
+def test_winter_waits_two_weeks() -> None:
+    assert quiet_period(date(2026, 11, 14)) == timedelta(days=2)
+    assert quiet_period(date(2026, 11, 15)) == timedelta(days=14)
+    assert quiet_period(date(2027, 1, 10)) == timedelta(days=14)
+    assert quiet_period(date(2027, 3, 15)) == timedelta(days=14)
+    assert quiet_period(date(2027, 3, 16)) == timedelta(days=2)
+    assert [span(2), span(14), span(7), span(5)] == ["2 дня", "2 недели", "1 неделю", "5 дней"]
+
+
+async def test_in_winter_a_few_quiet_days_are_not_enough(session: AsyncSession) -> None:
+    pushkina = await machine(session)
+    winter = datetime(2027, 1, 20, 12, tzinfo=TZ)
+    # The last coins came ten days ago; in summer that would long be an alert.
+    await add_sales(session, pushkina, ["coin", "card"] * 10, winter - timedelta(days=10))
+    await add_sales(session, pushkina, ["card", "bill"] * 10, winter)
+    assert (await PaymentWatch(session, FixedClock(winter)).run()).raised == []
+
+    # Five days later two weeks have passed without a coin.
+    later = winter + timedelta(days=5)
+    await add_sales(session, pushkina, ["card", "bill"] * 5, later)
+    raised = (await PaymentWatch(session, FixedClock(later)).run()).raised
+    assert [(a.channel, a.quiet_days) for a in raised] == [(PaymentChannel.COIN, 14)]

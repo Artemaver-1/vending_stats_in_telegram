@@ -95,6 +95,14 @@ def uptime_level(share: float | None) -> str:
     return "off"
 
 
+def span(days: int) -> str:
+    """How long a period lasts, as in "за 2 дня" or "за 2 недели"."""
+    if days % 7 == 0:
+        weeks = days // 7
+        return f"{weeks} {plural(weeks, 'неделю', 'недели', 'недель')}"
+    return f"{days} {plural(days, 'день', 'дня', 'дней')}"
+
+
 def plural(n: int, one: str, few: str, many: str) -> str:
     """Russian noun form for a number: 1 день, 2 дня, 5 дней."""
     n = abs(n) % 100

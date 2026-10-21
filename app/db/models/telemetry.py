@@ -71,6 +71,8 @@ class PaymentAlert(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     recent_sales: Mapped[int]
     recent_hits: Mapped[int]
+    # Length of the window the two counts above cover; it is longer in winter.
+    quiet_days: Mapped[int]
 
     machine: Mapped[Machine] = relationship()
 

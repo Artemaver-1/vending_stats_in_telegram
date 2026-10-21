@@ -22,6 +22,7 @@ from app.formatting import (
     month_title,
     plural,
     rub,
+    span,
     uptime_level,
 )
 
@@ -36,6 +37,7 @@ templates.env.filters.update(
     uptime_level=uptime_level,
     percent=lambda v: f"{v:.0%}",
     plural=plural,
+    span=span,
 )
 templates.env.globals.update(
     CHECKLIST=CHECKLIST,

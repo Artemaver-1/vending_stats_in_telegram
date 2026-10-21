@@ -10,7 +10,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BufferedInputFile
 
 from app.db.models import ConnectionEvent, Encashment, PaymentAlert, RentPayment, Task
-from app.formatting import CHANNEL_DEVICES, human_date, month_title, plural, rub
+from app.formatting import CHANNEL_DEVICES, human_date, month_title, plural, rub, span
 from app.services.downtime import Downtime
 from app.services.tasks import InspectionOutcome
 
@@ -190,7 +190,8 @@ class Messages:
         name = escape(alert.machine.name)
         return (
             f"⚠️ <b>«{name}»: проверьте {device}!</b>\n"
-            f"Силомер продаёт ({alert.recent_sales} оплат за 2 дня), а этим способом "
+            f"Силомер продаёт ({alert.recent_sales} оплат за {span(alert.quiet_days)}), "
+            "а этим способом "
             "за это время почти никто не заплатил. Возможно, он плохо работает или сломан."
         )
 
