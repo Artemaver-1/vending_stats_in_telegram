@@ -24,7 +24,7 @@
     <div class="label">Прибыль за {{ pnl.period | month_short }}</div>
     <div class="value {{ 'neg' if pnl.net_profit < 0 }}">{{ pnl.net_profit | rub }}</div>
   </div>
-  <a class="kpi wide" hx-get="/app/admin/economics" style="color:inherit">
+  <a class="kpi wide" hx-get="/app/admin/ofr?all_time=true" style="color:inherit">
     <div class="row between">
       <span class="label">Окупаемость бизнеса</span>
       <span class="chip {{ 'green' if payback.reached_in }}">{{ payback.progress | percent }}</span>

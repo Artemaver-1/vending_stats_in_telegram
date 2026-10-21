@@ -10,6 +10,7 @@ from app.clock import Clock
 from app.db.models import Attachment, InspectionCheck, Machine, Task, User
 from app.domain.enums import TaskKind, TaskStatus
 from app.domain.inspection import CHECKLIST, INSPECTION_INTERVAL, MACHINE_WORKS, REMINDER_OFFSETS
+from app.services.cash import CashError, EncashmentService
 
 TASK_DETAILS = (
     selectinload(Task.machine),
@@ -61,7 +62,7 @@ class TaskService:
             select(Task)
             .where(Task.status == TaskStatus.OPEN)
             .options(*TASK_DETAILS)
-            .order_by(Task.due_on, Task.id)
+            .order_by(Task.due_on.asc().nulls_last(), Task.id)
         )
         return result.all()
 
@@ -76,7 +77,11 @@ class TaskService:
         return result.all()
 
     async def with_status(self, status: TaskStatus, limit: int = 50) -> Sequence[Task]:
-        order = Task.due_on if status is TaskStatus.OPEN else Task.completed_at.desc()
+        order = (
+            Task.due_on.asc().nulls_last()
+            if status is TaskStatus.OPEN
+            else Task.completed_at.desc()
+        )
         result = await self.session.scalars(
             select(Task)
             .where(Task.status == status)
@@ -120,6 +125,8 @@ class TaskService:
             raise TaskError("Задача уже закрыта")
         if task.kind is TaskKind.INSPECTION:
             raise TaskError("Осмотр закрывается заполнением чек-листа")
+        if task.kind in {TaskKind.COUNT_CASH, TaskKind.DEPOSIT_CASH}:
+            raise TaskError("Эта задача закрывается вводом суммы")
         self._close(task, user, TaskStatus.DONE, comment)
         await self.session.flush()
         return task
@@ -188,6 +195,10 @@ class TaskService:
             raise TaskError("Это не отчёт")
         machine = report.machine
         latest = await self.last_inspection(report.machine_id) if report.machine_id else None
+        try:
+            await EncashmentService(self.session, self.clock).discard_for_report(report)
+        except CashError as exc:
+            raise TaskError(str(exc)) from exc
         await self.session.delete(report)
         await self.session.flush()
         if machine is None or latest is None or latest.id != report.id:
@@ -261,7 +272,9 @@ class TaskService:
         return [
             task
             for task in result
-            if (task.due_on - today).days in REMINDER_OFFSETS and task.reminded_on != today
+            if task.due_on is not None
+            and (task.due_on - today).days in REMINDER_OFFSETS
+            and task.reminded_on != today
         ]
 
     async def last_inspection(self, machine_id: int) -> Task | None:

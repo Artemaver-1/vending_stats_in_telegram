@@ -62,9 +62,23 @@ class UserRole(StrEnum):
 class TaskKind(StrEnum):
     INSPECTION = "inspection"
     CUSTOM = "custom"
+    COUNT_CASH = "count_cash"
+    DEPOSIT_CASH = "deposit_cash"
 
 
 class TaskStatus(StrEnum):
     OPEN = "open"
     DONE = "done"
     CANCELED = "canceled"
+
+
+class PaidFrom(StrEnum):
+    BANK = "bank"
+    CASH = "cash"
+    PERSONAL = "personal"
+
+
+class EncashmentStatus(StrEnum):
+    COLLECTED = "collected"
+    COUNTED = "counted"
+    DEPOSITED = "deposited"

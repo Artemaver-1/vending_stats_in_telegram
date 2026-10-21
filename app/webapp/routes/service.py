@@ -1,16 +1,18 @@
 import json
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, Response
 
 from app.api.deps import ClockDep, SessionDep
-from app.db.models import Machine, Task
+from app.db.models import Encashment, Machine, Task
 from app.domain.enums import TaskKind, UserRole
 from app.domain.inspection import CHECKLIST
 from app.repositories import MachineRepository
+from app.services.cash import CashError, EncashmentService
 from app.services.notifications import Messages
 from app.services.tasks import TaskError
 from app.webapp.auth import CurrentUser
@@ -59,8 +61,8 @@ async def home(
         revenue = await machine_revenue(session, machine, clock.today())
         cards.append(MachineCard(machine, last_day, next_due.get(machine.id), revenue))
 
-    # Weekly checks live on the machine cards, so the task list holds only one-off tasks.
-    listed = [t for t in open_tasks if t.kind is TaskKind.CUSTOM]
+    # Weekly checks live on the machine cards; the list holds one-off and cash tasks.
+    listed = [t for t in open_tasks if t.kind is not TaskKind.INSPECTION]
     done = await tasks.team_recently_done(TaskKind.CUSTOM, limit=5)
     return render(
         request,
@@ -75,9 +77,15 @@ async def home(
 
 @router.get("/tasks/{task_id}", response_class=HTMLResponse)
 async def task_page(
-    request: Request, task_id: int, user: CurrentUser, tasks: TasksDep
+    request: Request, task_id: int, user: CurrentUser, tasks: TasksDep, session: SessionDep
 ) -> HTMLResponse:
-    return render(request, "service/task.html", task=await _task_or_404(tasks, task_id))
+    task = await _task_or_404(tasks, task_id)
+    if task.encashment_id is not None:
+        encashment = await EncashmentService(session, request.app.state.clock).get(
+            task.encashment_id
+        )
+        return render(request, "service/cash_task.html", task=task, encashment=encashment)
+    return render(request, "service/task.html", task=task)
 
 
 @router.post("/tasks/{task_id}/done", response_class=HTMLResponse)
@@ -144,18 +152,28 @@ async def submit_report(
     machine = await _machine_or_404(session, machine_id)
     form = await request.form()
     results = {item.key: form.get(item.key) == "yes" for item in CHECKLIST if form.get(item.key)}
+    took = {key: form.get(key) for key in ("took_bills", "took_coins")}
+    if None in took.values():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Отметьте, забирали ли деньги")
     try:
         outcome = await tasks.submit_report(
             machine, user, results, comment=str(form.get("comment") or "")
         )
     except TaskError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    encashment = await EncashmentService(session, clock).collect(
+        machine,
+        user,
+        outcome.task,
+        bills=took["took_bills"] == "yes",
+        coins=took["took_coins"] == "yes",
+    )
     await session.commit()
 
     background.add_task(
         notifier.send,
         await users.telegram_ids(UserRole.ADMIN),
-        Messages.inspection_report(outcome, user.name),
+        Messages.inspection_report(outcome, user.name, encashment),
     )
     page = await home(request, user, tasks, session, clock)
     return with_toast(page, "Спасибо! Отчёт отправлен")
@@ -179,3 +197,86 @@ async def delete_report(
             "HX-Trigger": json.dumps({"toast": "Отчёт удалён"}),
         }
     )
+
+
+def _amount(raw: object) -> Decimal | None:
+    text = str(raw or "").replace("\xa0", "").replace(" ", "").replace(",", ".")
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except InvalidOperation as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Сумма указана неверно") from exc
+
+
+async def _encashment_or_404(
+    session: SessionDep, clock: ClockDep, encashment_id: int
+) -> Encashment:
+    encashment = await EncashmentService(session, clock).get(encashment_id)
+    if encashment is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Инкассация не найдена")
+    return encashment
+
+
+@router.post("/cash/{encashment_id}/count", response_class=HTMLResponse)
+async def count_cash(
+    request: Request,
+    encashment_id: int,
+    user: CurrentUser,
+    tasks: TasksDep,
+    users: UsersDep,
+    session: SessionDep,
+    clock: ClockDep,
+    notifier: NotifierDep,
+    background: BackgroundTasks,
+) -> HTMLResponse:
+    encashment = await _encashment_or_404(session, clock, encashment_id)
+    form = await request.form()
+    try:
+        await EncashmentService(session, clock).count(
+            encashment, user, bills=_amount(form.get("bills")), coins=_amount(form.get("coins"))
+        )
+    except CashError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    await session.commit()
+    background.add_task(
+        notifier.send,
+        await users.telegram_ids(UserRole.ADMIN),
+        Messages.cash_counted(encashment, user.name),
+    )
+    page = await home(request, user, tasks, session, clock)
+    return with_toast(page, "Записал! Теперь деньги нужно отнести в банк")
+
+
+@router.post("/cash/{encashment_id}/deposit", response_class=HTMLResponse)
+async def deposit_cash(
+    request: Request,
+    encashment_id: int,
+    user: CurrentUser,
+    tasks: TasksDep,
+    users: UsersDep,
+    session: SessionDep,
+    clock: ClockDep,
+    notifier: NotifierDep,
+    background: BackgroundTasks,
+    amount: Annotated[str, Form()],
+    deposited_on: Annotated[date, Form()],
+) -> HTMLResponse:
+    encashment = await _encashment_or_404(session, clock, encashment_id)
+    value = _amount(amount)
+    if value is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Впишите сумму")
+    try:
+        await EncashmentService(session, clock).deposit(
+            encashment, user, amount=value, on=deposited_on
+        )
+    except CashError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    await session.commit()
+    background.add_task(
+        notifier.send,
+        await users.telegram_ids(UserRole.ADMIN),
+        Messages.cash_deposited(encashment, user.name),
+    )
+    page = await home(request, user, tasks, session, clock)
+    return with_toast(page, "Готово, деньги на счёте")

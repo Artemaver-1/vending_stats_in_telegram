@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from app.domain.enums import ExpenseCategory, PaymentChannel
+from app.domain.enums import ExpenseCategory, PaidFrom, PaymentChannel
 from app.domain.reconciliation import DiscrepancyKind
 
 MONTHS = (
@@ -33,6 +33,12 @@ EXPENSE_LABELS = {
     ExpenseCategory.OTHER: "Прочее",
     ExpenseCategory.TAXES: "Налоги",
     ExpenseCategory.INSURANCE: "Страховые взносы",
+}
+
+PAID_FROM_LABELS = {
+    PaidFrom.BANK: "со счёта ИП",
+    PaidFrom.CASH: "наличными из инкассации",
+    PaidFrom.PERSONAL: "из своих денег",
 }
 
 DISCREPANCY_LABELS = {

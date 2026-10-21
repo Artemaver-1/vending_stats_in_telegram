@@ -1,7 +1,9 @@
 {% macro due_chip(task) -%}
-  {%- set days = (task.due_on - today).days -%}
+  {%- set days = (task.due_on - today).days if task.due_on else none -%}
   {%- if not task.is_open -%}
     <span class="chip green">готово</span>
+  {%- elif days is none -%}
+    <span class="chip grey">без срока</span>
   {%- elif days < 0 -%}
     <span class="chip red">просрочено</span>
   {%- elif days == 0 -%}
@@ -14,7 +16,7 @@
 {%- endmacro %}
 
 {% macro task_icon(task) -%}
-  {{ "🔍" if task.kind.value == "inspection" else "📌" }}
+  {{ {"inspection": "🔍", "custom": "📌", "count_cash": "🧮", "deposit_cash": "🏦"}[task.kind.value] }}
 {%- endmacro %}
 
 {% macro task_item(task, url) %}

@@ -1,7 +1,7 @@
 {% from "components.html" import check_results with context %}
 <div data-back="{{ back_url }}"></div>
 <h1>Отчёт «{{ machine.name }}»</h1>
-<p class="subtitle">Ответь на 4 вопроса и напиши комментарий</p>
+<p class="subtitle">Ответь на вопросы и напиши комментарий</p>
 
 <h2>Состояние до визита</h2>
 <div class="card {{ 'alert' if machine.is_broken }}">
@@ -27,6 +27,19 @@
         <label class="yes" for="{{ item.key }}-yes">✅ Да</label>
         <input type="radio" id="{{ item.key }}-no" name="{{ item.key }}" value="no">
         <label class="no" for="{{ item.key }}-no">❌ Нет</label>
+      </div>
+    </div>
+  {% endfor %}
+
+  {% for key, question in [("took_bills", "Забрал купюры?"), ("took_coins", "Забрал монеты?")] %}
+    <div class="check">
+      <div class="q">💵 {{ question }}</div>
+      <div class="h">Если забрал — появится задача посчитать деньги</div>
+      <div class="choice">
+        <input type="radio" id="{{ key }}-yes" name="{{ key }}" value="yes" required>
+        <label class="yes" for="{{ key }}-yes">Да, забрал</label>
+        <input type="radio" id="{{ key }}-no" name="{{ key }}" value="no">
+        <label class="no" for="{{ key }}-no">Нет</label>
       </div>
     </div>
   {% endfor %}

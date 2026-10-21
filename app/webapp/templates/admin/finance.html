@@ -1,0 +1,157 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+{% set b = balances %}
+<h1>Финансы</h1>
+<p class="subtitle">Где деньги сейчас и куда они ушли</p>
+
+{% if not b.ledger %}
+  <div class="card warn">
+    <b>Начните учёт денег</b>
+    <p class="hint" style="margin:6px 0 10px">
+      Укажите день, с которого считать, и сколько в этот день было на счёте ИП. От этой даты
+      считаются наличные в силомерах и остаток на счёте.
+    </p>
+    <form hx-post="/app/admin/finance/ledger">
+      <div class="two">
+        <label class="field"><span>Считать с</span><input type="date" name="opened_on" value="{{ today.isoformat() }}" required></label>
+        <label class="field"><span>На счёте, ₽</span><input name="bank_opening" inputmode="decimal" placeholder="0"></label>
+      </div>
+      <button class="btn" type="submit">Начать учёт</button>
+    </form>
+  </div>
+{% endif %}
+
+<div class="kpis">
+  <div class="kpi wide">
+    <div class="label">На счёте ИП (оценка)</div>
+    <div class="value">{{ b.bank | rub if b.bank is not none else "—" }}</div>
+    {% if b.ledger %}<div class="hint">с {{ b.ledger.opened_on.strftime("%d.%m.%Y") }}: остаток {{ b.ledger.bank_opening | rub }} + безнал + внесённые наличные − выплаты − расходы со счёта</div>{% endif %}
+  </div>
+  <div class="kpi">
+    <div class="label">В силомерах</div>
+    <div class="value">{{ ("≈ " ~ (b.in_machines_total | rub)) if b.in_machines_total is not none else "—" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Забрано, не посчитано</div>
+    <div class="value">{{ ("≈ " ~ (b.uncounted_expected | rub)) if b.uncounted else "0 ₽" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Посчитано, ждёт банка</div>
+    <div class="value">{{ b.counted_total | rub }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Выплачено со счёта</div>
+    <div class="value">{{ b.paid_out | rub }}</div>
+  </div>
+</div>
+
+<h2>Наличные в силомерах</h2>
+<div class="list">
+  {% for m in b.in_machines %}
+    <div class="item">
+      <span class="icon">🏧</span>
+      <span class="grow">
+        <div class="title">{{ m.machine.name }}</div>
+        <div class="meta">купюры {{ m.bills | rub if m.bills is not none else "—" }} · монеты {{ m.coins | rub if m.coins is not none else "—" }}</div>
+      </span>
+      <b>{{ m.total | rub if m.total is not none else "—" }}</b>
+    </div>
+  {% endfor %}
+</div>
+<p class="hint" style="margin:0 8px 6px">По данным SmartVend с последней инкассации{% if b.ledger %} или с начала учёта{% endif %}.</p>
+
+<h2>Инкассации</h2>
+{% for e in encashments %}
+  {% set step = e.status.value %}
+  <div class="card {{ 'warn' if step != 'deposited' }}">
+    <div class="row between">
+      <b>{{ e.machine.name }} · {{ e.collected_at.astimezone(tz).strftime("%d.%m.%Y") }}</b>
+      <span class="chip {{ 'green' if step == 'deposited' else ('amber' if step == 'counted' else 'red') }}">
+        {{ {"collected": "забрано", "counted": "посчитано", "deposited": "в банке"}[step] }}
+      </span>
+    </div>
+    <div class="hint" style="margin-top:4px">
+      {{ " и ".join(["купюры"] * e.took_bills + ["монеты"] * e.took_coins) }}{% if e.collected_by %} · забрал {{ e.collected_by.name }}{% endif %}
+    </div>
+    <table class="plain" style="margin-top:6px">
+      {% if e.expected is not none %}<tr><td class="muted">По SmartVend</td><td class="right">{{ e.expected | rub }}</td></tr>{% endif %}
+      {% if e.counted is not none %}
+        <tr><td class="muted">Посчитано{% if e.counted_by %} · {{ e.counted_by.name }}{% endif %}</td>
+            <td class="right">{{ e.counted | rub }}{% if e.expected is not none and e.counted != e.expected %} <span class="{{ 'danger' if e.counted < e.expected else 'ok' }}">({{ "+" if e.counted > e.expected }}{{ (e.counted - e.expected) | rub }})</span>{% endif %}</td></tr>
+      {% endif %}
+      {% if e.deposited is not none %}
+        <tr><td class="muted">Внесено {{ e.deposited_on.strftime("%d.%m.%Y") }}</td><td class="right">{{ e.deposited | rub }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+{% else %}
+  <div class="list"><div class="empty">Инкассаций пока не было — они появятся из отчётов</div></div>
+{% endfor %}
+
+<h2>Выплаты со счёта</h2>
+<details class="card" {{ "open" if not payouts }}>
+  <summary class="row between"><b>＋ Записать выплату</b><span class="chev"></span></summary>
+  <form hx-post="/app/admin/finance/payouts" style="margin-top:12px">
+    <div class="two">
+      <label class="field"><span>Сумма, ₽</span><input name="amount" inputmode="decimal" required></label>
+      <label class="field"><span>Дата</span><input type="date" name="paid_on" value="{{ today.isoformat() }}" required></label>
+    </div>
+    <label class="field"><span>Кому</span>
+      <input name="recipient" list="team" required placeholder="Имя">
+      <datalist id="team">{% for name in team %}<option value="{{ name }}">{% endfor %}</datalist>
+    </label>
+    <label class="field"><span>Комментарий</span><input name="note" placeholder="Например: распределение за 2025 год"></label>
+    <button class="btn" type="submit">Сохранить</button>
+  </form>
+</details>
+{% if paid_by %}
+  <div class="card">
+    <table class="plain">
+      {% for name, total in paid_by.items() %}<tr><td>{{ name }}</td><td class="right"><b>{{ total | rub }}</b></td></tr>{% endfor %}
+    </table>
+  </div>
+{% endif %}
+<div class="list">
+  {% for p in payouts %}
+    <div class="item">
+      <span class="icon">💸</span>
+      <span class="grow">
+        <div class="title">{{ p.recipient }} · {{ p.amount | rub }}</div>
+        <div class="meta">{{ p.paid_on.strftime("%d.%m.%Y") }}{% if p.note %} · {{ p.note }}{% endif %}</div>
+      </span>
+      <button class="btn small danger" hx-delete="/app/admin/finance/payouts/{{ p.id }}" hx-confirm="Удалить выплату?">✕</button>
+    </div>
+  {% else %}
+    <div class="empty">Выплат пока не было</div>
+  {% endfor %}
+</div>
+
+<h2>Движение по счёту за 12 месяцев</h2>
+<div class="card" style="overflow-x:auto">
+  <table class="plain" style="font-size:13px">
+    <tr><td class="muted">Месяц</td><td class="right muted">Безнал</td><td class="right muted">Наличные</td><td class="right muted">Расходы</td><td class="right muted">Выплаты</td></tr>
+    {% for f in flows %}
+      <tr>
+        <td>{{ f.month | month_short }} {{ f.month.year % 100 }}</td>
+        <td class="right">{{ f.card_in | rub if f.card_in else "—" }}</td>
+        <td class="right">{{ f.deposited | rub if f.deposited else "—" }}</td>
+        <td class="right">{{ ("−" ~ (f.spent_from_bank | rub)) if f.spent_from_bank else "—" }}</td>
+        <td class="right">{{ ("−" ~ (f.paid_out | rub)) if f.paid_out else "—" }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if b.ledger %}
+<details class="card">
+  <summary class="hint">⚙️ Начало учёта: {{ b.ledger.opened_on.strftime("%d.%m.%Y") }}, остаток {{ b.ledger.bank_opening | rub }}</summary>
+  <form hx-post="/app/admin/finance/ledger" style="margin-top:10px">
+    <div class="two">
+      <label class="field"><span>Считать с</span><input type="date" name="opened_on" value="{{ b.ledger.opened_on.isoformat() }}" required></label>
+      <label class="field"><span>На счёте, ₽</span><input name="bank_opening" inputmode="decimal" value="{{ b.ledger.bank_opening | int }}"></label>
+    </div>
+    <button class="btn small" type="submit">Сохранить</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

@@ -53,7 +53,7 @@ async def home(
 
     await rent.sync_accruals()
     rent_due = [p for p in await rent.payments() if not p.is_paid and (p.due_on - today).days <= 5]
-    overdue = [t for t in await tasks.with_status(TaskStatus.OPEN) if t.due_on < today]
+    overdue = [t for t in await tasks.with_status(TaskStatus.OPEN) if t.due_on and t.due_on < today]
     pending_users = sum(1 for u in await users.list_all() if not u.is_active)
     checked = [s.machine.status_checked_at for s in machines if s.machine.status_checked_at]
     failing = await session.scalars(select(SyncState).where(SyncState.last_error.is_not(None)))

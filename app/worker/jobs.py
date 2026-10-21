@@ -151,7 +151,7 @@ class ServiceJobs:
             admins = await users.telegram_ids(UserRole.ADMIN)
 
             for task in await TaskService(session, self.clock).due_reminders():
-                days_left = (task.due_on - today).days
+                days_left = (task.due_on - today).days if task.due_on else 0
                 await self.notifier.send(workers, Messages.task_reminder(task, days_left))
                 task.reminded_on = today
 

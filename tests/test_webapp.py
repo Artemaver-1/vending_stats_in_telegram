@@ -95,7 +95,11 @@ async def test_worker_report_reaches_admin(
     assert "Состояние до визита" in form_page.text
     assert "Терминал безнала (Вендиста) работает?" in form_page.text
 
-    answers = {item.key: "yes" for item in CHECKLIST} | {"machine": "no"}
+    answers = {item.key: "yes" for item in CHECKLIST} | {
+        "machine": "no",
+        "took_bills": "no",
+        "took_coins": "no",
+    }
     response = await client.post(
         f"/app/service/machines/{machine_id}/report",
         data=answers | {"comment": "Груша порвана, надо подшить"},
@@ -183,8 +187,7 @@ async def test_admin_creates_task_with_qr_for_worker(
         "/app/admin/ofr",
         "/app/admin/ofr?all_time=true",
         "/app/admin/ofr?start=2026-09-01&end=2026-09-30&machine=1",
-        "/app/admin/economics",
-        "/app/admin/economics?month=2026-09",
+        "/app/admin/finance",
         "/app/admin/rent",
         "/app/admin/rent/contracts/new",
         "/app/admin/machines",
@@ -329,3 +332,142 @@ async def test_worker_home_shows_takings_per_machine(
         )
     home = await client.get("/app/service", headers=as_user(WORKER_TG))
     assert "740 ₽" in home.text and "/app/machines/" in home.text
+
+
+async def report(client: httpx.AsyncClient, machine_id: int, **extra: str) -> httpx.Response:
+    form = {item.key: "yes" for item in CHECKLIST} | {"took_bills": "no", "took_coins": "no"}
+    return await client.post(
+        f"/app/service/machines/{machine_id}/report", data=form | extra, headers=as_user(WORKER_TG)
+    )
+
+
+async def test_cash_goes_from_machine_to_bank(
+    app: FastAPI, client: httpx.AsyncClient, db: Database
+) -> None:
+    from app.db.models import Encashment, TelemetrySale
+
+    async with db.session() as session:
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        machine_id = machine.id
+        session.add(
+            TelemetrySale(
+                id="s1",
+                machine_id=machine_id,
+                sold_at=datetime(2026, 10, 20, 15, tzinfo=TZ),
+                bill=Decimal("3000"),
+                coin=Decimal("0"),
+                card=Decimal("0"),
+            )
+        )
+    ledger = await client.post(
+        "/app/admin/finance/ledger",
+        data={"opened_on": "2026-10-01", "bank_opening": "10 000"},
+        headers=as_user(ADMIN_TG),
+    )
+    assert ledger.status_code == 200
+
+    assert (await report(client, machine_id, took_bills="yes")).status_code == 200
+    async with db.session() as session:
+        encashment = await session.scalar(select(Encashment))
+        assert encashment is not None and encashment.expected_bills == Decimal("3000")
+        count_task = await session.scalar(select(Task).where(Task.kind == TaskKind.COUNT_CASH))
+        assert count_task is not None and count_task.due_on is None
+        encashment_id, count_task_id = encashment.id, count_task.id
+
+    page = await client.get(f"/app/service/tasks/{count_task_id}", headers=as_user(WORKER_TG))
+    assert "Сумма купюр" in page.text and "Сумма монет" not in page.text
+    counted = await client.post(
+        f"/app/service/cash/{encashment_id}/count",
+        data={"bills": "2900"},
+        headers=as_user(WORKER_TG),
+    )
+    assert counted.status_code == 200 and "Внести 2 900 ₽" in counted.text
+    assert "ожидалось 3 000 ₽" in notifier(app).sent[-1][1]
+
+    deposited = await client.post(
+        f"/app/service/cash/{encashment_id}/deposit",
+        data={"amount": "2900", "deposited_on": "2026-10-21"},
+        headers=as_user(WORKER_TG),
+    )
+    assert deposited.status_code == 200
+
+    finance = await client.get("/app/admin/finance", headers=as_user(ADMIN_TG))
+    # 10 000 opening plus the deposited cash; no card takings or payouts yet.
+    assert "12 900 ₽" in finance.text and "в банке" in finance.text
+
+
+async def test_counted_cash_keeps_its_report(client: httpx.AsyncClient, db: Database) -> None:
+    from app.db.models import Encashment
+
+    async with db.session() as session:
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        machine_id = machine.id
+    await report(client, machine_id, took_coins="yes")
+    async with db.session() as session:
+        encashment = await session.scalar(select(Encashment))
+        assert encashment is not None
+        encashment_id, report_id = encashment.id, encashment.report_id
+    await client.post(
+        f"/app/service/cash/{encashment_id}/count",
+        data={"coins": "500"},
+        headers=as_user(WORKER_TG),
+    )
+    refused = await client.post(
+        f"/app/service/reports/{report_id}/delete", headers=as_user(WORKER_TG)
+    )
+    assert refused.status_code == 409
+
+
+async def test_report_can_be_deleted_and_commented(client: httpx.AsyncClient, db: Database) -> None:
+    async with db.session() as session:
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        machine_id = machine.id
+    await report(client, machine_id, comment="Грязный")
+    async with db.session() as session:
+        filed = await session.scalar(
+            select(Task).where(Task.kind == TaskKind.INSPECTION, Task.comment.is_not(None))
+        )
+        assert filed is not None
+        report_id = filed.id
+
+    edited = await client.post(
+        f"/app/admin/reports/{report_id}/comment",
+        data={"comment": "Грязный, помыли"},
+        headers=as_user(ADMIN_TG),
+    )
+    assert "Грязный, помыли" in edited.text
+
+    deleted = await client.post(
+        f"/app/service/reports/{report_id}/delete", headers=as_user(WORKER_TG)
+    )
+    assert (
+        deleted.status_code == 200
+        and f"/app/machines/{machine_id}" in deleted.headers["HX-Location"]
+    )
+    async with db.session() as session:
+        assert await session.get(Task, report_id) is None
+
+
+async def test_payout_and_cash_history(client: httpx.AsyncClient) -> None:
+    paid = await client.post(
+        "/app/admin/finance/payouts",
+        data={"amount": "50000", "paid_on": "2026-01-10", "recipient": "Артём", "note": "за 2025"},
+        headers=as_user(ADMIN_TG),
+    )
+    assert paid.status_code == 200 and "Артём · 50 000 ₽" in paid.text
+
+    history = await client.post(
+        "/app/admin/cash-history",
+        data={
+            "machine_id": "1",
+            "first_day": "2024-05-01",
+            "last_day": "2024-05-31",
+            "coins": "3 100",
+            "bills": "6200",
+        },
+        headers=as_user(ADMIN_TG),
+    )
+    assert history.status_code == 200 and "9 300 ₽" in history.text

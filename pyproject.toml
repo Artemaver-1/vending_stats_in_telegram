@@ -1,6 +1,6 @@
 [project]
 name = "vending-ops"
-version = "0.2.0"
+version = "0.3.0"
 description = "Telegram bot and API for running a small strength-tester vending business"
 readme = "README.md"
 requires-python = ">=3.12"

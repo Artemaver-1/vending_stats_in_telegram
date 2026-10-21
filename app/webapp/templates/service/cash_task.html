@@ -1,0 +1,52 @@
+{% set e = encashment %}
+<div data-back="/app/service"></div>
+<h1>{{ task.title }}</h1>
+<p class="subtitle">Без срока — главное не забыть</p>
+
+<div class="card">
+  <table class="plain">
+    <tr><td class="muted">Силомер</td><td class="right">{{ e.machine.name }}</td></tr>
+    <tr><td class="muted">Забрали</td><td class="right">{{ e.collected_at.astimezone(tz).strftime("%d.%m.%Y %H:%M") }}{% if e.collected_by %} · {{ e.collected_by.name }}{% endif %}</td></tr>
+    <tr><td class="muted">Что забрали</td><td class="right">{{ " и ".join(["купюры"] * e.took_bills + ["монеты"] * e.took_coins) }}</td></tr>
+    {% if e.counted is not none %}
+      {% if e.bills is not none %}<tr><td class="muted">Купюры</td><td class="right">{{ e.bills | rub }}</td></tr>{% endif %}
+      {% if e.coins is not none %}<tr><td class="muted">Монеты</td><td class="right">{{ e.coins | rub }}</td></tr>{% endif %}
+      <tr><td><b>Всего посчитано</b></td><td class="right"><b>{{ e.counted | rub }}</b></td></tr>
+    {% endif %}
+  </table>
+</div>
+
+{% if not task.is_open %}
+  <div class="card"><div class="ok" style="font-weight:700">✅ Сделано {{ task.completed_at.astimezone(tz).strftime("%d.%m в %H:%M") }}</div></div>
+{% elif task.kind.value == "count_cash" %}
+  <form hx-post="/app/service/cash/{{ e.id }}/count">
+    {% if e.took_bills %}
+      <div class="check">
+        <div class="q">Сумма купюр, ₽</div>
+        <div class="h">Сколько показала счётная машинка</div>
+        <input name="bills" inputmode="decimal" required placeholder="0">
+      </div>
+    {% endif %}
+    {% if e.took_coins %}
+      <div class="check">
+        <div class="q">Сумма монет, ₽</div>
+        <div class="h">Сколько показала счётная машинка</div>
+        <input name="coins" inputmode="decimal" required placeholder="0">
+      </div>
+    {% endif %}
+    <button class="btn" type="submit">🧮 Посчитал</button>
+  </form>
+{% else %}
+  <form hx-post="/app/service/cash/{{ e.id }}/deposit">
+    <div class="check">
+      <div class="q">Сколько внесли в банк, ₽</div>
+      <div class="h">Отнесите деньги в отделение Челябинвестбанка</div>
+      <input name="amount" inputmode="decimal" required value="{{ e.counted | int if e.counted is not none }}">
+    </div>
+    <div class="check">
+      <div class="q">Когда внесли</div>
+      <input type="date" name="deposited_on" required value="{{ today.isoformat() }}" max="{{ today.isoformat() }}">
+    </div>
+    <button class="btn" type="submit">🏦 Внёс в банк</button>
+  </form>
+{% endif %}

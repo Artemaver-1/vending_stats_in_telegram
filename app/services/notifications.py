@@ -9,7 +9,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BufferedInputFile
 
-from app.db.models import ConnectionEvent, RentPayment, Task
+from app.db.models import ConnectionEvent, Encashment, RentPayment, Task
 from app.formatting import human_date, month_title, rub
 from app.services.tasks import InspectionOutcome
 
@@ -57,7 +57,9 @@ class Messages:
         return f"🔴 <b>{name}</b>: связь потеряна в {at:%H:%M %d.%m}"
 
     @staticmethod
-    def inspection_report(outcome: InspectionOutcome, author: str) -> str:
+    def inspection_report(
+        outcome: InspectionOutcome, author: str, encashment: Encashment | None = None
+    ) -> str:
         task = outcome.task
         machine = escape(task.machine.name) if task.machine else "без аппарата"
         if outcome.machine_broke:
@@ -73,6 +75,16 @@ class Messages:
         lines += [f"{'✅' if c.ok else '❌'} {escape(c.label)}" for c in task.checks]
         if task.comment:
             lines.append(f"💬 {escape(task.comment)}")
+        if encashment is not None:
+            took = [
+                w
+                for w, t in (("купюры", encashment.took_bills), ("монеты", encashment.took_coins))
+                if t
+            ]
+            line = "💵 Забрал " + " и ".join(took)
+            if encashment.expected is not None:
+                line += f" — по SmartVend там ≈ {rub(encashment.expected)}"
+            lines.append(line)
         if outcome.machine_broke:
             lines.append("Еженедельные проверки по аппарату на паузе до ремонта.")
         return "\n".join(lines)
@@ -82,7 +94,8 @@ class Messages:
         lines = [f"📌 <b>Новая задача</b>: {escape(task.title)}"]
         if task.machine:
             lines.append(f"Силомер: {escape(task.machine.name)}")
-        lines.append(f"Когда: {human_date(task.due_on)}")
+        if task.due_on is not None:
+            lines.append(f"Когда: {human_date(task.due_on)}")
         if task.description:
             lines.append(escape(task.description))
         return "\n".join(lines)
@@ -115,3 +128,33 @@ class Messages:
             f"👤 {escape(name)}{handle} открыл бота, ID <code>{telegram_id}</code>.\n"
             "Открыть доступ можно в разделе «Команда»."
         )
+
+    @staticmethod
+    def cash_counted(encashment: Encashment, author: str) -> str:
+        lines = [
+            f"🧮 <b>Посчитаны деньги «{escape(encashment.machine.name)}»</b>",
+            f"Кто: {escape(author)}",
+        ]
+        if encashment.bills is not None:
+            lines.append(f"Купюры: {rub(encashment.bills)}")
+        if encashment.coins is not None:
+            lines.append(f"Монеты: {rub(encashment.coins)}")
+        counted, expected = encashment.counted, encashment.expected
+        if counted is not None and expected is not None:
+            diff = counted - expected
+            verdict = "сходится" if diff == 0 else f"разница {'+' if diff > 0 else ''}{rub(diff)}"
+            lines.append(f"По SmartVend ожидалось {rub(expected)} — {verdict}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def cash_deposited(encashment: Encashment, author: str) -> str:
+        deposited = encashment.deposited or 0
+        machine = escape(encashment.machine.name)
+        lines = [
+            f"🏦 <b>Внесено в банк {rub(deposited)}</b> — «{machine}»",
+            f"Кто: {escape(author)}",
+        ]
+        counted = encashment.counted
+        if counted is not None and counted != deposited:
+            lines.append(f"Посчитано было {rub(counted)}, разница {rub(counted - deposited)}")
+        return "\n".join(lines)

@@ -2,11 +2,11 @@
 {% from "components.html" import due_chip, check_results with context %}
 {% block content %}
 <h1>{{ task.title }}</h1>
-<p class="subtitle">{{ due_chip(task) }} · до {{ when(task.due_on) }}</p>
+<p class="subtitle">{{ due_chip(task) }}{% if task.due_on %} · до {{ when(task.due_on) }}{% endif %}</p>
 
 <div class="card">
   <table class="plain">
-    <tr><td class="muted">Тип</td><td class="right">{{ "Проверка силомера" if task.kind.value == "inspection" else "Разовая задача" }}</td></tr>
+    <tr><td class="muted">Тип</td><td class="right">{{ {"inspection": "Проверка силомера", "custom": "Разовая задача", "count_cash": "Посчитать деньги", "deposit_cash": "Внести деньги в банк"}[task.kind.value] }}</td></tr>
     {% if task.machine %}<tr><td class="muted">Силомер</td><td class="right">{{ task.machine.name }}</td></tr>{% endif %}
     {% if task.completed_at %}
       <tr><td class="muted">{{ "Выполнено" if task.status.value == "done" else "Отменено" }}</td>

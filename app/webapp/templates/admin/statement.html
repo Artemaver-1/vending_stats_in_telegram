@@ -66,4 +66,87 @@
   Аренда считается по договорам и добавленным вручную расходам «Аренда».
   {% if selected %}Общие расходы делятся поровну между силомерами.{% endif %}
 </p>
+
+<h2>Выручка и прибыль по месяцам</h2>
+<div class="card">
+  {{ chart }}
+  <div class="legend"><span><i style="background:color-mix(in srgb, var(--accent) 35%, transparent)"></i>выручка</span><span><i style="background:var(--ok)"></i>прибыль</span></div>
+</div>
+
+<h2>Расходы</h2>
+<details class="card" {{ "open" if not expenses }}>
+  <summary class="row between"><b>＋ Добавить расход</b><span class="chev"></span></summary>
+  <form hx-post="/app/admin/expenses" style="margin-top:12px">
+    <div class="two">
+      <label class="field"><span>Сумма, ₽</span><input name="amount" required inputmode="decimal"></label>
+      <label class="field"><span>Дата</span><input name="spent_on" type="date" value="{{ today.isoformat() }}" required></label>
+    </div>
+    <div class="two">
+      <label class="field"><span>Статья</span>
+        <select name="category">{% for c, label in EXPENSE_LABELS.items() %}<option value="{{ c.value }}">{{ label }}</option>{% endfor %}</select>
+      </label>
+      <label class="field"><span>Силомер</span>
+        <select name="machine_id"><option value="">общий</option>{% for m in machines %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    <label class="field"><span>Чем оплачено</span>
+      <select name="paid_from">{% for p, label in PAID_FROM_LABELS.items() %}<option value="{{ p.value }}" {{ "selected" if p.value == "bank" }}>{{ label }}</option>{% endfor %}</select>
+    </label>
+    <label class="field"><span>Комментарий</span><input name="description" placeholder="Например: груша, ремонт платы"></label>
+    <button class="btn" type="submit">Сохранить</button>
+  </form>
+</details>
+<div class="list">
+  {% for e in expenses %}
+    <div class="item">
+      <span class="icon">🧾</span>
+      <span class="grow">
+        <div class="title">{{ e.description or EXPENSE_LABELS[e.category] }}</div>
+        <div class="meta">{{ e.spent_on.strftime("%d.%m.%Y") }} · {{ EXPENSE_LABELS[e.category] }} · {{ e.machine.name if e.machine else "общий" }} · {{ PAID_FROM_LABELS[e.paid_from] }}</div>
+      </span>
+      <span style="font-weight:600">{{ e.amount | rub }}</span>
+      <button class="btn small danger" hx-delete="/app/admin/expenses/{{ e.id }}" hx-confirm="Удалить расход?">✕</button>
+    </div>
+  {% else %}
+    <div class="empty">Расходов пока нет</div>
+  {% endfor %}
+</div>
+
+<h2>Наличные до SmartVend</h2>
+<details class="card" {{ "open" if not cash_history }}>
+  <summary class="row between"><b>＋ Внести монеты и купюры за прошлый период</b><span class="chev"></span></summary>
+  <p class="hint" style="margin:10px 0">
+    Суммы распределятся по дням, когда силомер работал по оплатам Вендисты. Период должен
+    закончиться до дня, с которого наличные считает SmartVend.
+  </p>
+  <form hx-post="/app/admin/cash-history">
+    <label class="field"><span>Силомер</span>
+      <select name="machine_id">{% for m in machines %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
+    </label>
+    <div class="two">
+      <label class="field"><span>С</span><input type="date" name="first_day" required></label>
+      <label class="field"><span>По</span><input type="date" name="last_day" required></label>
+    </div>
+    <div class="two">
+      <label class="field"><span>Монеты, ₽</span><input name="coins" inputmode="decimal" placeholder="0"></label>
+      <label class="field"><span>Купюры, ₽</span><input name="bills" inputmode="decimal" placeholder="0"></label>
+    </div>
+    <label class="field"><span>Комментарий</span><input name="note" placeholder="Например: по записям в тетради"></label>
+    <button class="btn" type="submit">Внести</button>
+  </form>
+</details>
+<div class="list">
+  {% for c in cash_history %}
+    <div class="item">
+      <span class="icon">🪙</span>
+      <span class="grow">
+        <div class="title">{{ c.machine.name }} · {{ (c.coins + c.bills) | rub }}</div>
+        <div class="meta">{{ c.first_day.strftime("%d.%m.%Y") }} — {{ c.last_day.strftime("%d.%m.%Y") }} · монеты {{ c.coins | rub }}, купюры {{ c.bills | rub }}{% if c.note %} · {{ c.note }}{% endif %}</div>
+      </span>
+      <button class="btn small danger" hx-delete="/app/admin/cash-history/{{ c.id }}" hx-confirm="Удалить запись о наличных?">✕</button>
+    </div>
+  {% else %}
+    <div class="empty">Пока не внесено</div>
+  {% endfor %}
+</div>
 {% endblock %}

@@ -15,6 +15,7 @@ from app.formatting import (
     DISCREPANCY_LABELS,
     EXPENSE_LABELS,
     MONTHS_SHORT,
+    PAID_FROM_LABELS,
     WEEKDAYS,
     human_date,
     month_title,
@@ -38,6 +39,7 @@ templates.env.globals.update(
     CHANNEL_LABELS=CHANNEL_LABELS,
     DISCREPANCY_LABELS=DISCREPANCY_LABELS,
     EXPENSE_LABELS=EXPENSE_LABELS,
+    PAID_FROM_LABELS=PAID_FROM_LABELS,
     TaskStatus=TaskStatus,
 )
 
