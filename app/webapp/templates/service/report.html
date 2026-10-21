@@ -1,0 +1,41 @@
+{% from "components.html" import check_results with context %}
+<div data-back="/app/service"></div>
+<h1>Отчёт «{{ machine.name }}»</h1>
+<p class="subtitle">Ответь на 4 вопроса и напиши комментарий</p>
+
+<h2>Состояние до визита</h2>
+<div class="card {{ 'alert' if machine.is_broken }}">
+  {% if last %}
+    <div class="row between">
+      <b>{{ "🚨 Не работает" if machine.is_broken else ("⚠️ Были неполадки" if last.checks | rejectattr("ok") | list else "✅ Всё работало") }}</b>
+      <span class="hint">{{ last.completed_at.astimezone(tz).strftime("%d.%m") }}{% if last.completed_by %} · {{ last.completed_by.name }}{% endif %}</span>
+    </div>
+    {{ check_results(last) }}
+    {% if last.comment %}<p class="hint" style="margin:8px 0 0; white-space:pre-wrap">💬 {{ last.comment }}</p>{% endif %}
+  {% else %}
+    <span class="hint">Отчётов по этому силомеру ещё не было</span>
+  {% endif %}
+</div>
+
+<form hx-post="/app/service/machines/{{ machine.id }}/report">
+  {% for item in checklist %}
+    <div class="check">
+      <div class="q">{{ loop.index }}. {{ item.question }}</div>
+      <div class="h">{{ item.hint }}</div>
+      <div class="choice">
+        <input type="radio" id="{{ item.key }}-yes" name="{{ item.key }}" value="yes" required>
+        <label class="yes" for="{{ item.key }}-yes">✅ Да</label>
+        <input type="radio" id="{{ item.key }}-no" name="{{ item.key }}" value="no">
+        <label class="no" for="{{ item.key }}-no">❌ Нет</label>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="check">
+    <div class="q">Комментарий</div>
+    <div class="h">Что нового и в каком состоянии силомер: грязный, треснуло стекло, грушу пора заказать или подшить</div>
+    <textarea name="comment" placeholder="Если всё в порядке — можно оставить пустым"></textarea>
+  </div>
+
+  <button class="btn" type="submit">Отправить отчёт</button>
+</form>

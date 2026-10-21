@@ -61,23 +61,20 @@ class Messages:
         task = outcome.task
         machine = escape(task.machine.name) if task.machine else "без аппарата"
         if outcome.machine_broke:
-            head = f"🚨 <b>{machine}: силомер не работает</b>"
+            head = f"🚨 <b>Отчёт «{machine}»: силомер не работает</b>"
         elif outcome.machine_fixed:
-            head = f"🛠 <b>{machine}: починен и снова работает</b>"
+            head = f"🛠 <b>Отчёт «{machine}»: снова работает</b>"
         elif outcome.failed:
-            head = f"⚠️ <b>{machine}: есть неполадки</b>"
+            head = f"⚠️ <b>Отчёт «{machine}»: есть неполадки</b>"
         else:
-            head = f"✅ <b>{machine}: всё в порядке</b>"
+            head = f"✅ <b>Отчёт «{machine}»: всё работает</b>"
 
-        lines = [head, f"Проверил: {escape(author)}"]
-        if outcome.failed:
-            lines.append("Не работает: " + ", ".join(escape(f) for f in outcome.failed))
-        if outcome.purchase is not None:
-            lines.append(f"🛒 Нужно заказать: {escape(outcome.purchase.text)}")
+        lines = [head, f"От: {escape(author)}"]
+        lines += [f"{'✅' if c.ok else '❌'} {escape(c.label)}" for c in task.checks]
         if task.comment:
             lines.append(f"💬 {escape(task.comment)}")
         if outcome.machine_broke:
-            lines.append("Осмотры по аппарату остановлены до ремонта.")
+            lines.append("Еженедельные проверки по аппарату на паузе до ремонта.")
         return "\n".join(lines)
 
     @staticmethod

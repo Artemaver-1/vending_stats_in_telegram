@@ -14,7 +14,6 @@ from app.formatting import (
     CHANNEL_LABELS,
     EXPENSE_LABELS,
     MONTHS_SHORT,
-    PURCHASE_LABELS,
     WEEKDAYS,
     human_date,
     month_title,
@@ -37,7 +36,6 @@ templates.env.globals.update(
     CHECKLIST=CHECKLIST,
     CHANNEL_LABELS=CHANNEL_LABELS,
     EXPENSE_LABELS=EXPENSE_LABELS,
-    PURCHASE_LABELS=PURCHASE_LABELS,
     TaskStatus=TaskStatus,
 )
 

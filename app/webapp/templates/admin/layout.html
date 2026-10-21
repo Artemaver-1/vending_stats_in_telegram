@@ -4,7 +4,7 @@
 {% set tabs = [
   ("home", "/app/admin", "🏠", "Главная"),
   ("tasks", "/app/admin/tasks", "📋", "Задачи"),
-  ("purchases", "/app/admin/purchases", "🛒", "Заявки"),
+  ("reports", "/app/admin/reports", "📝", "Инфа"),
   ("money", "/app/admin/economics", "📈", "Экономика"),
   ("rent", "/app/admin/rent", "🏢", "Аренда"),
 ] %}
@@ -12,7 +12,7 @@
   {% for key, url, icon, label in tabs %}
     <a hx-get="{{ url }}" class="{{ 'active' if tab == key }}">
       <b>{{ icon }}</b>{{ label }}
-      {% if key == "purchases" and new_purchases %}<span class="badge">{{ new_purchases }}</span>{% endif %}
+      {% if key == "reports" and unseen_reports %}<span class="badge">{{ unseen_reports }}</span>{% endif %}
     </a>
   {% endfor %}
 </nav>

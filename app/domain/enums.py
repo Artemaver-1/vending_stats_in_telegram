@@ -65,9 +65,3 @@ class TaskStatus(StrEnum):
     OPEN = "open"
     DONE = "done"
     CANCELED = "canceled"
-
-
-class PurchaseStatus(StrEnum):
-    NEW = "new"
-    ORDERED = "ordered"
-    DONE = "done"

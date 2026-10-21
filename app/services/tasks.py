@@ -2,12 +2,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.clock import Clock
-from app.db.models import Attachment, InspectionCheck, Machine, PurchaseRequest, Task, User
+from app.db.models import Attachment, InspectionCheck, Machine, Task, User
 from app.domain.enums import TaskKind, TaskStatus
 from app.domain.inspection import CHECKLIST, INSPECTION_INTERVAL, MACHINE_WORKS, REMINDER_OFFSETS
 
@@ -40,11 +40,10 @@ class InspectionOutcome:
     failed: list[str] = field(default_factory=list)
     machine_broke: bool = False
     machine_fixed: bool = False
-    purchase: PurchaseRequest | None = None
 
     @property
     def needs_attention(self) -> bool:
-        return bool(self.failed or self.purchase)
+        return bool(self.failed or self.task.comment)
 
 
 class TaskService:
@@ -135,20 +134,27 @@ class TaskService:
             self._close(task, user, TaskStatus.CANCELED, None)
             await self.session.flush()
 
-    async def submit_inspection(
+    async def submit_report(
         self,
-        task: Task,
+        machine: Machine,
         user: User,
         results: Mapping[str, bool],
         *,
-        order: str | None = None,
         comment: str | None = None,
     ) -> InspectionOutcome:
-        if task.kind is not TaskKind.INSPECTION or not task.is_open:
-            raise TaskError("Этот осмотр уже проведён")
-        missing = [item.label for item in CHECKLIST if item.key not in results]
+        """Records a visit to a machine.
+
+        The report closes the machine's pending weekly inspection if there is one, so a
+        visit made early still counts, and the next inspection is due a week later.
+        """
+        missing = [item.question for item in CHECKLIST if item.key not in results]
         if missing:
             raise TaskError("Не отмечено: " + ", ".join(missing))
+
+        task = await self._open_inspection(machine.id)
+        if task is None:
+            task = await self._new_inspection(machine, self.clock.today())
+        task = await self._reload(task)
 
         task.checks = [
             InspectionCheck(position=i, item=item.key, label=item.label, ok=results[item.key])
@@ -157,35 +163,54 @@ class TaskService:
         self._close(task, user, TaskStatus.DONE, comment)
         outcome = InspectionOutcome(task=task, failed=[c.label for c in task.checks if not c.ok])
 
-        machine = task.machine
-        if machine is not None:
-            works = results[MACHINE_WORKS.key]
-            if not works and not machine.is_broken:
-                machine.broken_since = self.clock.now()
-                outcome.machine_broke = True
-            elif works and machine.is_broken:
-                machine.broken_since = None
-                outcome.machine_fixed = True
-
-        order = (order or "").strip()
-        if order:
-            outcome.purchase = PurchaseRequest(
-                text=order, machine_id=task.machine_id, task_id=task.id, created_by_id=user.id
-            )
-            self.session.add(outcome.purchase)
+        works = results[MACHINE_WORKS.key]
+        if not works and not machine.is_broken:
+            machine.broken_since = self.clock.now()
+            outcome.machine_broke = True
+        elif works and machine.is_broken:
+            machine.broken_since = None
+            outcome.machine_fixed = True
 
         await self.session.flush()
-        if machine is not None and not machine.is_broken:
+        if not machine.is_broken:
             await self._schedule_for(machine)
         return outcome
 
-    async def start_repair_check(self, machine: Machine) -> Task:
-        """A broken machine has no weekly inspections; after fixing it the worker runs one now."""
-        existing = await self._open_inspection(machine.id)
-        if existing is not None:
-            existing.due_on = min(existing.due_on, self.clock.today())
-            return existing
-        return await self._new_inspection(machine, self.clock.today())
+    async def reports(self, machine_id: int | None = None, limit: int = 50) -> Sequence[Task]:
+        stmt = (
+            select(Task)
+            .where(Task.kind == TaskKind.INSPECTION, Task.status == TaskStatus.DONE)
+            .options(*TASK_DETAILS)
+            .order_by(Task.completed_at.desc())
+            .limit(limit)
+        )
+        if machine_id is not None:
+            stmt = stmt.where(Task.machine_id == machine_id)
+        result = await self.session.scalars(stmt)
+        return result.all()
+
+    async def count_unseen_reports(self) -> int:
+        count = await self.session.scalar(
+            select(func.count())
+            .select_from(Task)
+            .where(
+                Task.kind == TaskKind.INSPECTION,
+                Task.status == TaskStatus.DONE,
+                Task.seen_at.is_(None),
+            )
+        )
+        return count or 0
+
+    async def mark_reports_seen(self) -> None:
+        await self.session.execute(
+            update(Task)
+            .where(
+                Task.kind == TaskKind.INSPECTION,
+                Task.status == TaskStatus.DONE,
+                Task.seen_at.is_(None),
+            )
+            .values(seen_at=self.clock.now())
+        )
 
     async def schedule_inspections(self) -> list[Task]:
         machines = await self.session.scalars(select(Machine).where(Machine.is_active))

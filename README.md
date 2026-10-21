@@ -7,13 +7,17 @@ task list with weekly inspection checklists.
 
 ## Roles
 
-- **Admin** — dashboard, tasks for the crew (with a QR code or file attached), purchase
-  requests coming from inspections, economics per month and per machine, rent contracts
-  with accruals and payment marks, machine status and uptime, team access.
-- **Service** — "Обслуживание силомеров": open tasks, a four-question inspection with big
-  yes/no buttons and a "what to order" field. If the machine as a whole doesn't work it is
-  marked broken, the admin is alerted and weekly inspections pause until a repair check
-  passes. Reminders arrive two days and one day before a task is due.
+- **Admin** — dashboard with a button to pull fresh SmartVend data, tasks for the crew
+  (with a QR code or file attached), "Инфа от работника" — every report the crew files,
+  economics per month and per machine, rent contracts with accruals and payment marks,
+  machine status and uptime, team access.
+- **Service** — "Обслуживание силомеров": one-off tasks from the admin and the list of
+  machines. On site the worker opens a machine, sees its state after the previous visit
+  and answers four yes/no questions (machine usable at all, coin acceptor, bill acceptor,
+  Vendista terminal) plus a free comment. Each report is sent to the admin at once.
+  A report counts as the weekly inspection; the next one is due a week later, with
+  reminders two days and one day before. If the machine isn't usable at all it is marked
+  broken and weekly inspections pause until a report says it works again.
 
 Everyone who opens the bot is recorded as an access request; admins (from `ADMIN_IDS`)
 let people in from the Team screen.

@@ -14,12 +14,12 @@ from fastapi import (
 from fastapi.responses import HTMLResponse
 
 from app.api.deps import SessionDep
-from app.domain.enums import PurchaseStatus, TaskStatus, UserRole
+from app.domain.enums import TaskStatus, UserRole
 from app.repositories import MachineRepository
 from app.services.notifications import Messages, Photo
 from app.services.tasks import NewAttachment
 from app.webapp.auth import AdminUser
-from app.webapp.deps import NotifierDep, PurchasesDep, TasksDep, UsersDep
+from app.webapp.deps import NotifierDep, TasksDep, UsersDep
 from app.webapp.routes.admin.common import admin_page, optional_int
 
 router = APIRouter(prefix="/app/admin")
@@ -132,41 +132,3 @@ async def cancel_task(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Задача не найдена")
     await tasks.cancel(task, admin)
     return await tasks_page(request, admin, session, tasks, toast="Задача отменена")
-
-
-@router.get("/purchases", response_class=HTMLResponse)
-async def purchases_page(
-    request: Request,
-    _: AdminUser,
-    session: SessionDep,
-    purchases: PurchasesDep,
-    view: str = "open",
-    toast: str | None = None,
-) -> HTMLResponse:
-    open_only = view != "done"
-    return await admin_page(
-        request,
-        session,
-        "admin/purchases.html",
-        tab="purchases",
-        view="open" if open_only else "done",
-        requests=await purchases.list(open_only=open_only),
-        toast=toast,
-    )
-
-
-@router.post("/purchases/{request_id}/{new_status}", response_class=HTMLResponse)
-async def update_purchase(
-    request: Request,
-    request_id: int,
-    new_status: PurchaseStatus,
-    admin: AdminUser,
-    session: SessionDep,
-    purchases: PurchasesDep,
-) -> HTMLResponse:
-    purchase = await purchases.get(request_id)
-    if purchase is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Заявка не найдена")
-    await purchases.set_status(purchase, new_status)
-    toast = "Отмечено как заказано" if new_status is PurchaseStatus.ORDERED else "Заявка закрыта"
-    return await purchases_page(request, admin, session, purchases, toast=toast)

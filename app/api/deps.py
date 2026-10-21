@@ -19,7 +19,8 @@ async def get_session(db: Annotated[Database, Depends(get_db)]) -> AsyncIterator
 
 
 def get_clock(request: Request) -> Clock:
-    return Clock(request.app.state.settings.tz)
+    clock: Clock = request.app.state.clock
+    return clock
 
 
 DbDep = Annotated[Database, Depends(get_db)]

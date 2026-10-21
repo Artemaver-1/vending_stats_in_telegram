@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, str_enum
 from app.db.models.location import Machine
-from app.domain.enums import PurchaseStatus, TaskKind, TaskStatus, UserRole
+from app.domain.enums import TaskKind, TaskStatus, UserRole
 
 
 class User(TimestampMixin, Base):
@@ -59,6 +59,8 @@ class Task(TimestampMixin, Base):
     completed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     comment: Mapped[str | None] = mapped_column(Text)
     reminded_on: Mapped[date | None]
+    # When an admin first saw the finished report in "Инфа от работника".
+    seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     machine: Mapped[Machine | None] = relationship()
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
@@ -84,19 +86,3 @@ class InspectionCheck(Base):
     ok: Mapped[bool]
 
     task: Mapped[Task] = relationship(back_populates="checks")
-
-
-class PurchaseRequest(TimestampMixin, Base):
-    __tablename__ = "purchase_requests"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    text: Mapped[str] = mapped_column(Text)
-    status: Mapped[PurchaseStatus] = mapped_column(
-        str_enum(PurchaseStatus), default=PurchaseStatus.NEW, index=True
-    )
-    machine_id: Mapped[int | None] = mapped_column(ForeignKey("machines.id", ondelete="SET NULL"))
-    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"))
-    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-
-    machine: Mapped[Machine | None] = relationship()
-    created_by: Mapped[User | None] = relationship()

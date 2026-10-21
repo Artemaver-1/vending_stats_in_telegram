@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Machine, PurchaseRequest, Task, User
+from app.db.models import Machine, Task, User
 from app.domain.enums import TaskKind, TaskStatus, UserRole
 from app.domain.inspection import CHECKLIST
 from app.services.tasks import TaskError, TaskService
@@ -58,54 +58,70 @@ async def test_first_inspections_are_due_today_for_active_machines(
     assert again == []
 
 
-async def test_passed_inspection_schedules_next_one_a_week_later(
-    session: AsyncSession, machines: list[Machine], worker: User, clock: FixedClock
-) -> None:
-    service = TaskService(session, clock)
-    task = next(t for t in await service.schedule_inspections() if t.machine_id == machines[0].id)
-
-    outcome = await service.submit_inspection(task, worker, ALL_OK)
-
-    assert not outcome.needs_attention
-    assert [c.ok for c in task.checks] == [True] * len(CHECKLIST)
-    upcoming = [t for t in await open_inspections(session) if t.machine_id == machines[0].id]
-    assert [t.due_on for t in upcoming] == [date(2026, 10, 28)]
-
-
-async def test_broken_machine_pauses_inspections_until_repair_check(
+async def test_report_closes_weekly_inspection_and_schedules_next(
     session: AsyncSession, machines: list[Machine], worker: User, clock: FixedClock
 ) -> None:
     service = TaskService(session, clock)
     pushkina = machines[0]
-    task = next(t for t in await service.schedule_inspections() if t.machine_id == pushkina.id)
+    await service.schedule_inspections()
 
-    outcome = await service.submit_inspection(
-        task, worker, {**ALL_OK, "machine": False}, order="Новая груша"
+    outcome = await service.submit_report(pushkina, worker, ALL_OK)
+
+    assert not outcome.needs_attention
+    assert [c.label for c in outcome.task.checks] == [i.label for i in CHECKLIST]
+    upcoming = [t for t in await open_inspections(session) if t.machine_id == pushkina.id]
+    assert [t.due_on for t in upcoming] == [date(2026, 10, 28)]
+
+
+async def test_report_without_pending_inspection_is_recorded_too(
+    session: AsyncSession, machines: list[Machine], worker: User, clock: FixedClock
+) -> None:
+    service = TaskService(session, clock)
+    outcome = await service.submit_report(
+        machines[1], worker, {**ALL_OK, "bill": False}, comment="Стекло треснуло"
     )
+    assert outcome.needs_attention and outcome.failed == ["Купюроприёмник"]
+    assert [r.comment for r in await service.reports(machines[1].id)] == ["Стекло треснуло"]
+
+
+async def test_broken_machine_pauses_inspections_until_a_passing_report(
+    session: AsyncSession, machines: list[Machine], worker: User, clock: FixedClock
+) -> None:
+    service = TaskService(session, clock)
+    pushkina = machines[0]
+    await service.schedule_inspections()
+
+    outcome = await service.submit_report(pushkina, worker, {**ALL_OK, "machine": False})
     assert outcome.machine_broke and pushkina.is_broken
-    assert outcome.failed == ["Силомер работает"]
-    purchase = await session.scalar(select(PurchaseRequest))
-    assert purchase is not None and purchase.text == "Новая груша"
+    assert outcome.failed == ["Силомер"]
 
     clock.shift(days=10)
     await service.schedule_inspections()
     assert all(t.machine_id != pushkina.id for t in await open_inspections(session))
 
-    repair = await service.start_repair_check(pushkina)
-    assert repair.due_on == clock.today()
-    fixed = await service.submit_inspection(repair, worker, ALL_OK)
+    fixed = await service.submit_report(pushkina, worker, ALL_OK)
     assert fixed.machine_fixed and not pushkina.is_broken
     upcoming = [t for t in await open_inspections(session) if t.machine_id == pushkina.id]
     assert [t.due_on for t in upcoming] == [clock.today() + timedelta(days=7)]
 
 
-async def test_inspection_needs_every_answer(
+async def test_unseen_reports_counter(
     session: AsyncSession, machines: list[Machine], worker: User, clock: FixedClock
 ) -> None:
     service = TaskService(session, clock)
-    task = (await service.schedule_inspections())[0]
+    await service.submit_report(machines[0], worker, ALL_OK)
+    await service.submit_report(machines[1], worker, ALL_OK)
+    assert await service.count_unseen_reports() == 2
+
+    await service.mark_reports_seen()
+    assert await service.count_unseen_reports() == 0
+
+
+async def test_report_needs_every_answer(
+    session: AsyncSession, machines: list[Machine], worker: User, clock: FixedClock
+) -> None:
     with pytest.raises(TaskError, match="Не отмечено"):
-        await service.submit_inspection(task, worker, {"machine": True})
+        await TaskService(session, clock).submit_report(machines[0], worker, {"machine": True})
 
 
 async def test_reminders_two_days_and_one_day_before_only(

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
 from app.api.deps import ClockDep, SessionDep
@@ -14,6 +14,7 @@ from app.services.finance import FinanceService
 from app.webapp.auth import AdminUser
 from app.webapp.deps import RentDep, TasksDep, UsersDep
 from app.webapp.routes.admin.common import admin_page
+from app.worker.jobs import TelemetryJobs
 
 router = APIRouter()
 
@@ -34,6 +35,7 @@ async def home(
     tasks: TasksDep,
     rent: RentDep,
     users: UsersDep,
+    toast: str | None = None,
 ) -> HTMLResponse:
     today = clock.today()
     finance = FinanceService(session)
@@ -51,6 +53,7 @@ async def home(
     rent_due = [p for p in await rent.payments() if not p.is_paid and (p.due_on - today).days <= 5]
     overdue = [t for t in await tasks.with_status(TaskStatus.OPEN) if t.due_on < today]
     pending_users = sum(1 for u in await users.list_all() if not u.is_active)
+    checked = [s.machine.status_checked_at for s in machines if s.machine.status_checked_at]
 
     return await admin_page(
         request,
@@ -64,4 +67,28 @@ async def home(
         rent_due=rent_due,
         pending_users=pending_users,
         month_name=MONTHS_GENITIVE[today.month - 1],
+        synced_at=max(checked) if checked else None,
+        toast=toast,
+    )
+
+
+@router.post("/app/admin/sync", response_class=HTMLResponse)
+async def refresh_smartvend(
+    request: Request,
+    admin: AdminUser,
+    session: SessionDep,
+    clock: ClockDep,
+    tasks: TasksDep,
+    rent: RentDep,
+    users: UsersDep,
+) -> HTMLResponse:
+    telemetry: TelemetryJobs | None = getattr(request.app.state, "telemetry", None)
+    if telemetry is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "SmartVend не настроен")
+    if not await telemetry.refresh_all():
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "SmartVend не ответил, попробуйте позже")
+    # The sync committed in its own sessions; drop anything this one cached before it.
+    session.expire_all()
+    return await home(
+        request, admin, session, clock, tasks, rent, users, toast="Данные SmartVend обновлены"
     )

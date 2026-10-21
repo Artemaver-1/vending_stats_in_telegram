@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from app.domain.enums import ExpenseCategory, PaymentChannel, PurchaseStatus
+from app.domain.enums import ExpenseCategory, PaymentChannel
 
 MONTHS = (
     "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -29,12 +29,6 @@ EXPENSE_LABELS = {
     ExpenseCategory.CONNECTIVITY: "Связь",
     ExpenseCategory.TRANSPORT: "Транспорт",
     ExpenseCategory.OTHER: "Прочее",
-}
-
-PURCHASE_LABELS = {
-    PurchaseStatus.NEW: "Новая",
-    PurchaseStatus.ORDERED: "Заказано",
-    PurchaseStatus.DONE: "Готово",
 }
 
 

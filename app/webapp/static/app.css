@@ -193,3 +193,6 @@ table.plain tr:first-child td { border-top: 0; }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
 details summary { cursor: pointer; list-style: none; }
 details summary::-webkit-details-marker { display: none; }
+.refresh .busy { display: none; }
+.refresh.htmx-request .idle { display: none; }
+.refresh.htmx-request .busy { display: inline; }

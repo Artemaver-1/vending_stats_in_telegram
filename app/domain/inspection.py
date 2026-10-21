@@ -9,16 +9,31 @@ REMINDER_OFFSETS = (2, 1)
 @dataclass(frozen=True, slots=True)
 class ChecklistItem:
     key: str
+    # Short name kept with the answer and shown in reports.
     label: str
+    question: str
     hint: str
 
 
 # When the machine as a whole doesn't work it is marked broken and weekly inspections pause.
-MACHINE_WORKS = ChecklistItem("machine", "Силомер работает", "Включается, удар засчитывается")
+MACHINE_WORKS = ChecklistItem(
+    "machine",
+    "Силомер",
+    "Силомер работает?",
+    "«Да» — если клиент может оплатить хоть одним способом и ударить. "
+    "«Нет» — если не включается, не работает экран, не опускается груша, "
+    "не работает ни одна оплата или груша порвана так, что бить нельзя.",
+)
 
 CHECKLIST: tuple[ChecklistItem, ...] = (
     MACHINE_WORKS,
-    ChecklistItem("coin", "Монетоприёмник", "Монета принимается и засчитывается"),
-    ChecklistItem("bill", "Купюроприёмник", "Купюра затягивается и засчитывается"),
-    ChecklistItem("card", "Терминал оплаты картой", "Терминал включён и принимает оплату"),
+    ChecklistItem(
+        "coin", "Монетоприёмник", "Монетоприёмник работает?", "Монета принимается и засчитывается"
+    ),
+    ChecklistItem(
+        "bill", "Купюроприёмник", "Купюроприёмник работает?", "Купюра затягивается и засчитывается"
+    ),
+    ChecklistItem(
+        "card", "Вендиста", "Терминал безнала (Вендиста) работает?", "Оплата картой проходит"
+    ),
 )

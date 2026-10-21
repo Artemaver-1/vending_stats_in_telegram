@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.api.main import create_app
 from app.config import Settings
 from app.db import Database
-from app.db.models import Location, Machine, PurchaseRequest, Task, User
+from app.db.models import Location, Machine, Task, User
 from app.domain.enums import TaskKind, UserRole
 from app.domain.inspection import CHECKLIST
 from tests.helpers import BOT_TOKEN, TZ, FakeNotifier, FixedClock, make_init_data
@@ -76,36 +76,63 @@ async def test_home_routes_by_role(client: httpx.AsyncClient) -> None:
     assert '"/app/service"' in worker.headers["HX-Location"]
 
 
-async def test_worker_inspection_reports_broken_machine(
+async def test_worker_report_reaches_admin(
     app: FastAPI, client: httpx.AsyncClient, db: Database
 ) -> None:
     async with db.session() as session:
-        from app.services.tasks import TaskService
-
-        (task,) = await TaskService(session, app.state.clock).schedule_inspections()
-        task_id = task.id
+        machine = await session.scalar(select(Machine))
+        assert machine is not None
+        machine_id = machine.id
 
     home = await client.get("/app/service", headers=as_user(WORKER_TG))
     assert "Обслуживание силомеров" in home.text
     assert "работник" not in home.text.lower()
-    assert "Проверка силомера «Пушкина»" in home.text
+    assert f"/app/service/machines/{machine_id}/report" in home.text
 
-    form = {item.key: "yes" for item in CHECKLIST} | {"machine": "no", "order": "Груша"}
+    form_page = await client.get(
+        f"/app/service/machines/{machine_id}/report", headers=as_user(WORKER_TG)
+    )
+    assert "Состояние до визита" in form_page.text
+    assert "Терминал безнала (Вендиста) работает?" in form_page.text
+
+    answers = {item.key: "yes" for item in CHECKLIST} | {"machine": "no"}
     response = await client.post(
-        f"/app/service/tasks/{task_id}/inspection", data=form, headers=as_user(WORKER_TG)
+        f"/app/service/machines/{machine_id}/report",
+        data=answers | {"comment": "Груша порвана, надо подшить"},
+        headers=as_user(WORKER_TG),
     )
     assert response.status_code == 200
     assert "toast" in response.headers["HX-Trigger"]
-    assert "Починил — проверить" in response.text
 
     ((recipients, text, _),) = notifier(app).sent
     assert recipients == [ADMIN_TG]
-    assert "силомер не работает" in text and "Груша" in text
+    assert "силомер не работает" in text and "подшить" in text
 
-    async with db.session() as session:
-        machine = await session.scalar(select(Machine))
-        assert machine is not None and machine.is_broken
-        assert await session.scalar(select(PurchaseRequest.text)) == "Груша"
+    feed = await client.get("/app/admin/reports", headers=as_user(ADMIN_TG))
+    assert "Инфа от работника" in feed.text
+    assert "Груша порвана, надо подшить" in feed.text and "новый" in feed.text
+    again = await client.get("/app/admin/reports", headers=as_user(ADMIN_TG))
+    assert "новый" not in again.text
+
+    next_form = await client.get(
+        f"/app/service/machines/{machine_id}/report", headers=as_user(WORKER_TG)
+    )
+    assert "Не работает" in next_form.text and "надо подшить" in next_form.text
+
+
+async def test_refresh_button_runs_sync(app: FastAPI, client: httpx.AsyncClient) -> None:
+    class FakeTelemetry:
+        calls = 0
+
+        async def refresh_all(self) -> bool:
+            self.calls += 1
+            return True
+
+    fake = FakeTelemetry()
+    app.state.telemetry = fake
+    response = await client.post("/app/admin/sync", headers=as_user(ADMIN_TG))
+    assert response.status_code == 200 and fake.calls == 1
+    assert (await client.post("/app/admin/sync", headers=as_user(WORKER_TG))).status_code == 403
 
 
 async def test_admin_creates_task_with_qr_for_worker(
@@ -145,7 +172,7 @@ async def test_admin_creates_task_with_qr_for_worker(
         "/app/admin/tasks",
         "/app/admin/tasks?view=done",
         "/app/admin/tasks/new",
-        "/app/admin/purchases",
+        "/app/admin/reports",
         "/app/admin/economics",
         "/app/admin/economics?month=2026-09",
         "/app/admin/rent",

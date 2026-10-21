@@ -14,10 +14,12 @@ from app.api.routes import finance, health
 from app.clock import Clock
 from app.config import Settings, get_settings
 from app.db import Database
+from app.integrations.smartvend import SmartVendClient
 from app.services.notifications import TelegramNotifier
 from app.webapp.auth import LinkSigner, admin_user
 from app.webapp.routes import service, shell
 from app.webapp.routes.admin import router as admin_router
+from app.worker.jobs import TelemetryJobs
 
 STATIC_DIR = Path(__file__).parent.parent / "webapp" / "static"
 
@@ -33,7 +35,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.db = Database(settings.database_url)
         app.state.notifier = TelegramNotifier(bot)
+        smartvend = None
+        if settings.smartvend_api_key is not None:
+            smartvend = SmartVendClient(
+                settings.smartvend_api_key.get_secret_value(), settings.smartvend_base_url
+            )
+            app.state.telemetry = TelemetryJobs(
+                settings, app.state.db, smartvend, app.state.notifier, app.state.clock
+            )
         yield
+        if smartvend is not None:
+            await smartvend.close()
         await bot.session.close()
         await app.state.db.dispose()
 

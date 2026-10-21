@@ -4,7 +4,8 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.purchases import PurchaseService
+from app.clock import Clock
+from app.services.tasks import TaskService
 from app.webapp.templating import render
 
 
@@ -22,8 +23,9 @@ async def admin_page(
     Commits first, so a screen returned after a change never shows unsaved state.
     """
     await session.commit()
-    new_purchases = await PurchaseService(session).count_new()
-    return render(request, template, tab=tab, new_purchases=new_purchases, toast=toast, **context)
+    clock: Clock = request.app.state.clock
+    unseen = await TaskService(session, clock).count_unseen_reports()
+    return render(request, template, tab=tab, unseen_reports=unseen, toast=toast, **context)
 
 
 def optional_int(value: str | None) -> int | None:

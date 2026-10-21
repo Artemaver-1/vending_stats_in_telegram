@@ -1,0 +1,35 @@
+{% extends "admin/layout.html" %}
+{% from "components.html" import check_results with context %}
+{% block content %}
+<h1>Инфа от работника</h1>
+<p class="subtitle">Все отчёты о состоянии силомеров</p>
+
+<div class="segmented">
+  <a hx-get="/app/admin/reports" class="{{ 'active' if not selected }}">Все</a>
+  {% for m in machines %}
+    <a hx-get="/app/admin/reports?machine={{ m.id }}" class="{{ 'active' if selected == m.id }}">{{ m.name }}</a>
+  {% endfor %}
+</div>
+
+{% for r in reports %}
+  {% set failed = r.checks | rejectattr("ok") | list %}
+  {% set down = r.checks | selectattr("item", "equalto", "machine") | rejectattr("ok") | list %}
+  <div class="card {{ 'alert' if down else ('warn' if failed or r.comment else '') }}">
+    <div class="row between">
+      <b style="font-size:16px">{{ r.machine.name if r.machine else "—" }}</b>
+      <span class="row" style="gap:6px">
+        {% if r.id in unseen %}<span class="chip red">новый</span>{% endif %}
+        <span class="hint">{{ r.completed_at.astimezone(tz).strftime("%d.%m %H:%M") }}</span>
+      </span>
+    </div>
+    <div style="margin-top:4px; font-weight:600">
+      {% if down %}🚨 Силомер не работает{% elif failed %}⚠️ Есть неполадки{% else %}✅ Всё работает{% endif %}
+    </div>
+    {{ check_results(r) }}
+    {% if r.comment %}<p style="margin:10px 0 0; white-space:pre-wrap">💬 {{ r.comment }}</p>{% endif %}
+    <div class="hint" style="margin-top:8px">{{ r.completed_by.name if r.completed_by else "" }}</div>
+  </div>
+{% else %}
+  <div class="list"><div class="empty">Отчётов пока нет</div></div>
+{% endfor %}
+{% endblock %}

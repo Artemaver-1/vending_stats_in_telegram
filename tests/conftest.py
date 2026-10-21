@@ -2,6 +2,7 @@ import os
 from collections.abc import AsyncIterator
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.models  # noqa: F401  registers tables on Base.metadata
@@ -16,7 +17,9 @@ TEST_DATABASE_URL = os.environ.get(
 async def db() -> AsyncIterator[Database]:
     database = Database(TEST_DATABASE_URL)
     async with database.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # Recreating the schema also clears tables of models that no longer exist.
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
     yield database
     await database.dispose()

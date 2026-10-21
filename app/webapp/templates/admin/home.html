@@ -1,8 +1,16 @@
 {% extends "admin/layout.html" %}
 {% from "components.html" import progress, task_item with context %}
 {% block content %}
-<h1>Силомеры</h1>
-<p class="subtitle">{{ today.day }} {{ month_name }} · {{ today | weekday }}</p>
+<div class="row between" style="align-items:flex-start">
+  <div>
+    <h1>Силомеры</h1>
+    <p class="subtitle">{{ today.day }} {{ month_name }} · {{ today | weekday }}</p>
+  </div>
+  <button class="btn small secondary refresh" style="margin-top:10px" hx-post="/app/admin/sync" hx-disabled-elt="this">
+    <span class="idle">🔄 Обновить</span><span class="busy">Обновляю…</span>
+  </button>
+</div>
+{% if synced_at %}<p class="hint" style="margin:-8px 4px 12px">Данные SmartVend на {{ synced_at.astimezone(tz).strftime("%H:%M %d.%m") }}</p>{% endif %}
 
 <div class="kpis">
   <div class="kpi">
@@ -43,14 +51,14 @@
   {% endfor %}
 </div>
 
-{% if overdue or new_purchases or rent_due %}
+{% if overdue or unseen_reports or rent_due %}
 <h2>Требует внимания</h2>
 <div class="list">
-  {% if new_purchases %}
-    <a class="item" hx-get="/app/admin/purchases">
-      <span class="icon">🛒</span>
-      <span class="grow"><div class="title">Новые заявки на закупку</div></span>
-      <span class="chip red">{{ new_purchases }}</span>
+  {% if unseen_reports %}
+    <a class="item" hx-get="/app/admin/reports">
+      <span class="icon">📝</span>
+      <span class="grow"><div class="title">Новые отчёты от работника</div></span>
+      <span class="chip red">{{ unseen_reports }}</span>
     </a>
   {% endif %}
   {% for task in overdue %}
