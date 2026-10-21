@@ -53,6 +53,25 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
 
+  # Daily pg_dump into ./backups on the host, kept for BACKUP_KEEP_DAYS days.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup-loop.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-vending}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-vending}
+      PGDATABASE: ${POSTGRES_DB:-vending}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      TZ: ${TIMEZONE:-Asia/Yekaterinburg}
+    volumes:
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
   # Gives the Mini App a public HTTPS address without a domain or port forwarding.
   # The address changes on restart; the bot reads it from the metrics endpoint.
   tunnel:

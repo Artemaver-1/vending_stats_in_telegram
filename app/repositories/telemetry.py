@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Insert, delete, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,19 +49,25 @@ class DailyRevenueWriter:
         self.session = session
 
     async def replace_days(
-        self, first: date, last: date, source: RevenueSource, rows: Sequence[dict[str, Any]]
+        self,
+        first: date,
+        last: date,
+        source: RevenueSource,
+        rows: Sequence[dict[str, Any]],
+        *,
+        machine_id: int | None = None,
     ) -> None:
         """Atomically swaps the revenue a source reported for [first, last] with fresh rows."""
-        await self.session.execute(
-            delete(DailyRevenue).where(
-                DailyRevenue.source == source,
-                DailyRevenue.day >= first,
-                DailyRevenue.day <= last,
-            )
+        stmt = delete(DailyRevenue).where(
+            DailyRevenue.source == source,
+            DailyRevenue.day >= first,
+            DailyRevenue.day <= last,
         )
+        if machine_id is not None:
+            stmt = stmt.where(DailyRevenue.machine_id == machine_id)
+        await self.session.execute(stmt)
         if rows:
-            stmt: Insert = insert(DailyRevenue).values(list(rows))
-            await self.session.execute(stmt)
+            await self.session.execute(insert(DailyRevenue).values(list(rows)))
 
 
 class ConnectionEventRepository(Repository[ConnectionEvent]):

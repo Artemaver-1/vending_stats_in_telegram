@@ -38,8 +38,38 @@
             hx-confirm="{{ 'Отметить, что силомер снова работает?' if machine.is_broken else 'Отметить силомер сломанным? Проверки встанут на паузу.' }}">
       {{ "🛠 Отметить рабочим" if machine.is_broken else "🚨 Отметить сломанным" }}
     </button>
+
+    <details style="margin-top:12px">
+      <summary class="hint">⚙️ Дата запуска, стоимость, терминал Вендисты</summary>
+      <form hx-post="/app/admin/machines/{{ machine.id }}/settings" style="margin-top:10px">
+        <div class="two">
+          <label class="field"><span>Запущен</span>
+            <input type="date" name="launched_on" value="{{ machine.launched_on.isoformat() if machine.launched_on }}">
+          </label>
+          <label class="field"><span>Стоимость, ₽</span>
+            <input name="purchase_cost" inputmode="decimal" value="{{ machine.purchase_cost | int }}">
+          </label>
+        </div>
+        <label class="field"><span>ID терминала Вендисты</span>
+          <input name="vendista_terminal_id" inputmode="numeric" value="{{ machine.vendista_terminal_id or '' }}" placeholder="например 131508">
+        </label>
+        <button class="btn small" type="submit">Сохранить</button>
+      </form>
+    </details>
   </div>
 {% endfor %}
+
+<h2>Вендиста</h2>
+<form class="card" hx-post="/app/admin/vendista/import" hx-encoding="multipart/form-data">
+  <p class="hint" style="margin-top:0">
+    Выгрузка «Транзакции» в CSV из личного кабинета. Безнал берётся за дни, когда на силомере
+    ещё не было SmartVend; повторная загрузка того же файла ничего не задвоит.
+  </p>
+  <input type="file" name="export" accept=".csv,text/csv" required>
+  <button class="btn small refresh" type="submit" style="margin-top:10px" hx-disabled-elt="this">
+    <span class="idle">📥 Загрузить</span><span class="busy">Загружаю…</span>
+  </button>
+</form>
 <div class="legend" style="margin:0 6px">
   <span><i style="background:var(--ok)"></i>весь день</span><span><i style="background:var(--warn)"></i>с перебоями</span><span><i style="background:var(--danger)"></i>офлайн</span>
 </div>

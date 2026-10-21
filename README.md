@@ -86,6 +86,28 @@ being up:
 - Connection alerts older than three hours are stored silently instead of arriving as a
   burst of stale messages after downtime.
 
+## Backups and moving to another computer
+
+Postgres keeps its data in the `pgdata` Docker volume, so it survives container rebuilds
+but lives on this machine only. The `backup` service writes a compressed `pg_dump` to
+`./backups` on start and every 24 hours, keeping 30 days (`BACKUP_KEEP_DAYS`).
+
+```bash
+scripts/backup-now.sh                          # fresh dump into ./backups
+scripts/restore.sh backups/vending-....sql.gz   # load a dump into the running db
+```
+
+To move: take a fresh dump and stop everything on the old machine (two bots polling the
+same token conflict), then on the new one clone the repo, copy `.env` and the dump,
+`docker compose up -d db`, run `scripts/restore.sh <dump>` and `docker compose up -d`.
+
+## Historical card revenue
+
+Before SmartVend was installed, card payments are known only from the Vendista terminal.
+Admin → Аппараты → Вендиста accepts the "Транзакции" CSV export: successful payments
+minus successful refunds, Moscow time converted to Chelyabinsk, and only for days before
+the machine's first SmartVend sale, so nothing is counted twice.
+
 ## Development
 
 Tests run against PostgreSQL (`TEST_DATABASE_URL`, defaults to a `vending_test` database
