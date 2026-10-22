@@ -3,25 +3,26 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from aiogram import Bot
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramAPIError
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api.routes import finance, health
+from app.api.routes import finance, health, hooks
+from app.bot.client import make_bot
+from app.bot.setup import build_dispatcher
+from app.bot.webapp_link import WebAppLink
 from app.clock import Clock
 from app.config import Settings, get_settings
 from app.db import Database
 from app.integrations.smartvend import SmartVendClient
+from app.services.file_drop import FileDrop
 from app.services.notifications import TelegramNotifier
 from app.webapp.auth import LinkSigner, admin_user
 from app.webapp.routes import machines, service, shell, widget
 from app.webapp.routes.admin import router as admin_router
-from app.worker.jobs import TelemetryJobs
+from app.worker.jobs import ServiceJobs, TelemetryJobs
 
 STATIC_DIR = Path(__file__).parent.parent / "webapp" / "static"
 
@@ -31,12 +32,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        bot = Bot(
-            settings.bot_token.get_secret_value(),
-            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-        )
+        bot = make_bot(settings)
+        app.state.bot = bot
         app.state.db = Database(settings.database_url)
-        app.state.notifier = TelegramNotifier(bot)
+        # Through the Telegram relay big uploads get cut off, so files go out as links.
+        drop = None
+        if settings.telegram_api_url:
+            drop = FileDrop(app.state.db, settings.telegram_api_url)
+        app.state.file_drop = drop
+        app.state.notifier = TelegramNotifier(bot, drop)
+        app.state.service_jobs = ServiceJobs(app.state.db, app.state.notifier, app.state.clock)
+        if settings.hook_secret is not None:
+            webapp = WebAppLink(settings.webapp_url, settings.tunnel_metrics_url)
+            app.state.dispatcher = build_dispatcher(bot, app.state.db, webapp)
         with contextlib.suppress(TelegramAPIError, OSError):
             app.state.bot_username = (await bot.get_me()).username
         smartvend = None
@@ -74,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.bot_username = None
 
     app.include_router(health.router)
+    app.include_router(hooks.router)
     # The JSON API is reachable through the same tunnel as the Mini App, so it's admin-only.
     app.include_router(finance.router, dependencies=[Depends(admin_user)])
     app.include_router(shell.router)

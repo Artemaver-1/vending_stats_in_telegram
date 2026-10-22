@@ -1,9 +1,10 @@
 // Силомеры — виджет обслуживания для Scriptable (iPhone).
 // Спокойный, пока всё работает; красный, когда силомер стоит; жёлтый, когда нужно
-// проверить приёмник оплаты. Обновляется примерно раз в 15 минут.
+// проверить приёмник оплаты. Обновляется примерно раз в 30 минут.
 const TOKEN = "{{TOKEN}}";
 const BOT = "{{BOT}}";
-const FALLBACK_URL = "{{URL}}";
+const URL = "{{URL}}";
+const CACHE = "silomery_last_data";
 
 const RED = new Color("#e5262d");
 const YELLOW = new Color("#ffd43b");
@@ -21,24 +22,26 @@ const FAMILY = config.widgetFamily || "medium";
 const SMALL = FAMILY === "small";
 const SCALE = SMALL ? 0.8 : FAMILY === "large" || FAMILY === "extraLarge" ? 1.35 : 1;
 
-// Адрес приложения меняется при перезапуске туннеля; бот держит актуальный в описании.
-async function baseUrl() {
-  if (args.widgetParameter) return args.widgetParameter.trim().replace(/\/+$/, "");
-  try {
-    const html = await new Request("https://t.me/" + BOT).loadString();
-    const found = html.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
-    if (found) {
-      Keychain.set("silomery_url", found[0]);
-      return found[0];
-    }
-  } catch (e) {}
-  return Keychain.contains("silomery_url") ? Keychain.get("silomery_url") : FALLBACK_URL;
+// Поле Parameter в настройках виджета может подменить адрес, но только настоящим адресом.
+function baseUrl() {
+  const custom = (args.widgetParameter || "").trim();
+  return custom.startsWith("https://") ? custom.replace(/\/+$/, "") : URL;
 }
 
+// Последние полученные данные хранятся на телефоне: без связи виджет показывает их
+// с временем обновления, а не пустую ошибку.
 async function load() {
-  const request = new Request((await baseUrl()) + "/widget/" + TOKEN);
-  request.timeoutInterval = 20;
-  return await request.loadJSON();
+  try {
+    const request = new Request(baseUrl() + "/widget/" + TOKEN);
+    request.timeoutInterval = 25;
+    const data = await request.loadJSON();
+    if (!Array.isArray(data.down)) throw new Error("сервер ответил не данными");
+    Keychain.set(CACHE, JSON.stringify(data));
+    return { data, problem: null };
+  } catch (e) {
+    if (!Keychain.contains(CACHE)) throw e;
+    return { data: JSON.parse(Keychain.get(CACHE)), problem: e };
+  }
 }
 
 const FONTS = {
@@ -123,7 +126,7 @@ function footer(parent, data, color, faint) {
   text(r, taskLine(data), 13, color, "semibold");
   r.addSpacer();
   r.addSpacer(8);
-  text(r, data.updated, 10, faint, "regular");
+  text(r, (data.stale ? "⚠︎ нет связи · " : "") + data.updated, 10, faint, "regular");
 }
 
 // The red part: which machine stands, why, and for how many days.
@@ -246,7 +249,7 @@ function lockScreen(w, data) {
 function build(data) {
   const w = new ListWidget();
   w.url = "https://t.me/" + BOT;
-  w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+  w.refreshAfterDate = new Date(Date.now() + 30 * 60 * 1000);
   if (FAMILY.startsWith("accessory")) {
     lockScreen(w, data);
     return w;
@@ -257,22 +260,32 @@ function build(data) {
   return w;
 }
 
-function offline() {
+// The reason goes on the widget itself, so a screenshot is enough to see what broke.
+function trouble(title, error) {
   const w = new ListWidget();
   w.backgroundColor = CALM;
+  w.url = "https://t.me/" + BOT;
   w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
   text(w, "СИЛОМЕРЫ", 13, CALM_HINT, "heavy");
   w.addSpacer(4);
-  text(w, "Нет связи с приложением", 16, CALM_TEXT, "bold", 2);
-  text(w, "Откройте бота — адрес обновится", 12, CALM_HINT, "regular", 2);
+  text(w, title, 16, CALM_TEXT, "bold", 2);
+  text(w, String((error && error.message) || error), 11, CALM_HINT, "regular", 3);
   return w;
 }
 
 let widget;
+let loaded = null;
 try {
-  widget = build(await load());
+  loaded = await load();
 } catch (e) {
-  widget = offline();
+  widget = trouble("Нет связи с приложением", e);
+}
+if (loaded) {
+  try {
+    widget = build({ ...loaded.data, stale: loaded.problem !== null });
+  } catch (e) {
+    widget = trouble("Виджет не смог нарисоваться", e);
+  }
 }
 if (config.runsInWidget) Script.setWidget(widget);
 else await widget.presentMedium();

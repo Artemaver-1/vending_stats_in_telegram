@@ -41,6 +41,18 @@ class Attachment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class OutgoingFile(Base):
+    """A file Telegram fetches by link instead of us uploading it; uploads from Russian
+    clouds through the relay get cut off after a few kilobytes. Kept for a day."""
+
+    __tablename__ = "outgoing_files"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    filename: Mapped[str] = mapped_column(String(200))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Task(TimestampMixin, Base):
     __tablename__ = "tasks"
 

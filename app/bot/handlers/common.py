@@ -10,7 +10,7 @@ from app.db.models import User
 
 router = Router(name="common")
 
-WELCOME_PICTURE = Path(__file__).parent.parent / "assets" / "welcome.jpg"
+WELCOME_PICTURE = Path(__file__).parents[2] / "webapp" / "static" / "welcome.jpg"
 
 ADMIN_WELCOME = (
     "<b>силомеры.рф</b> — панель управления\n\n"
@@ -20,14 +20,19 @@ SERVICE_WELCOME = "<b>Обслуживание силомеров</b>\n\nВаш�
 
 
 class WelcomePicture:
-    """Uploads the picture once and reuses Telegram's file_id afterwards."""
+    """Sends the picture once and reuses Telegram's file_id afterwards. While the Mini App
+    has a public address, Telegram fetches the picture from there instead of an upload."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
         self.file_id: str | None = None
 
-    def input(self) -> str | FSInputFile:
-        return self.file_id or FSInputFile(self.path)
+    def input(self, link: WebAppLink) -> str | FSInputFile:
+        if self.file_id:
+            return self.file_id
+        if link.url:
+            return link.url.removesuffix("/app") + "/static/" + self.path.name
+        return FSInputFile(self.path)
 
     def remember(self, message: Message) -> None:
         if message.photo:
@@ -56,7 +61,7 @@ async def start(message: Message, user: User, webapp: WebAppLink) -> None:
 
     if user.is_admin:
         sent = await message.answer_photo(
-            welcome_picture.input(), caption=ADMIN_WELCOME, reply_markup=keyboard
+            welcome_picture.input(webapp), caption=ADMIN_WELCOME, reply_markup=keyboard
         )
         welcome_picture.remember(sent)
     else:

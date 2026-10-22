@@ -1,6 +1,6 @@
 [project]
 name = "vending-ops"
-version = "0.4.0"
+version = "0.5.0"
 description = "Telegram Mini App для учёта, обслуживания и инкассации вендинговых силомеров"
 readme = "README.md"
 requires-python = ">=3.12"

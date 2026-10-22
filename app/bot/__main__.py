@@ -2,30 +2,17 @@ import asyncio
 import contextlib
 import logging
 
-from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramAPIError
+from aiogram import Bot
 
-from app.bot.handlers import build_router
-from app.bot.middlewares import AccessMiddleware, DatabaseMiddleware
+from app.bot.client import make_bot
+from app.bot.setup import bootstrap_admins, build_dispatcher, point_team_at, publish_address
 from app.bot.webapp_link import WebAppLink
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.db import Database
-from app.services.notifications import TelegramNotifier
-from app.services.staff import UserService
 
 logger = logging.getLogger(__name__)
 
 LINK_CHECK_SECONDS = 120
-
-
-def build_dispatcher(bot: Bot, db: Database, webapp: WebAppLink) -> Dispatcher:
-    dp = Dispatcher(webapp=webapp)
-    dp.update.outer_middleware(DatabaseMiddleware(db))
-    dp.update.outer_middleware(AccessMiddleware(TelegramNotifier(bot)))
-    dp.include_router(build_router())
-    return dp
 
 
 async def keep_menu_buttons_fresh(bot: Bot, db: Database, webapp: WebAppLink) -> None:
@@ -34,28 +21,9 @@ async def keep_menu_buttons_fresh(bot: Bot, db: Database, webapp: WebAppLink) ->
         if await webapp.refresh():
             logger.info("Mini App is now at %s", webapp.url)
             await publish_address(bot, webapp)
-            async with db.session() as session:
-                users = [u for u in await UserService(session).list_all() if u.is_active]
-            await webapp.apply(bot, users)
+            await point_team_at(bot, db, webapp)
         # Until the tunnel reports its address, ask often so /start works soon after boot.
         await asyncio.sleep(LINK_CHECK_SECONDS if webapp.url else 5)
-
-
-async def publish_address(bot: Bot, webapp: WebAppLink) -> None:
-    """The iPhone widget can't ask the bot, but it can read the bot's public profile page,
-    so the current address goes into the short description."""
-    if webapp.url is None:
-        return
-    base = webapp.url.removesuffix("/app")
-    with contextlib.suppress(TelegramAPIError):
-        await bot.set_my_short_description(f"Задачи и статистика силомеров · {base}")
-
-
-async def bootstrap_admins(db: Database, settings: Settings) -> None:
-    if not settings.admin_ids:
-        logger.warning("ADMIN_IDS is empty, nobody can let people into the bot")
-    async with db.session() as session:
-        await UserService(session).ensure_admins(settings.admin_ids)
 
 
 async def main() -> None:
@@ -66,10 +34,7 @@ async def main() -> None:
     )
 
     db = Database(settings.database_url)
-    bot = Bot(
-        settings.bot_token.get_secret_value(),
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+    bot = make_bot(settings)
     webapp = WebAppLink(settings.webapp_url, settings.tunnel_metrics_url)
     dp = build_dispatcher(bot, db, webapp)
     await bootstrap_admins(db, settings)

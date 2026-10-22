@@ -33,7 +33,10 @@ async def send_widget_script(
 ) -> HTMLResponse:
     token = await WidgetService(session, clock).token_for(user)
     await session.commit()
-    base = str(request.base_url).rstrip("/").replace("http://", "https://")
+    # A fixed address outlives tunnel restarts, so the widget never has to look it up.
+    settings = request.app.state.settings
+    base = (settings.webapp_url or str(request.base_url)).rstrip("/")
+    base = base.replace("http://", "https://")
     script = (
         SCRIPT_TEMPLATE.read_text()
         .replace("{{TOKEN}}", token)

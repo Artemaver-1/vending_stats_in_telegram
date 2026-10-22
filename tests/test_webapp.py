@@ -69,6 +69,13 @@ async def test_shell_is_public_but_screens_are_not(client: httpx.AsyncClient) ->
     assert (await client.get("/finance/payback", headers=as_user(WORKER_TG))).status_code == 403
 
 
+async def test_init_data_header_survives_clouds_that_drop_authorization(
+    client: httpx.AsyncClient,
+) -> None:
+    headers = {"X-Telegram-Init-Data": make_init_data(WORKER_TG), "HX-Request": "true"}
+    assert (await client.get("/app/service", headers=headers)).status_code == 200
+
+
 async def test_home_routes_by_role(client: httpx.AsyncClient) -> None:
     admin = await client.get("/app/home", headers=as_user(ADMIN_TG))
     worker = await client.get("/app/home", headers=as_user(WORKER_TG))

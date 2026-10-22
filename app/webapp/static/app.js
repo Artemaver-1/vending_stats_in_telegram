@@ -22,7 +22,7 @@
   });
 
   document.body.addEventListener("htmx:configRequest", (event) => {
-    event.detail.headers["Authorization"] = "tma " + initData;
+    event.detail.headers["X-Telegram-Init-Data"] = initData;
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {

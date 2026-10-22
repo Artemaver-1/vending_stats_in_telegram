@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import Field, PostgresDsn, SecretStr, computed_field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,15 @@ class Settings(BaseSettings):
     tunnel_metrics_url: str = "http://tunnel:2000"
     # Exposes /docs; keep off when the API is reachable through the tunnel.
     api_docs: bool = False
+    # Telegram can't be reached from Russian clouds; there the bot talks to it through
+    # the relay in deploy/telegram-relay.
+    telegram_api_url: str | None = None
+    # Guards the webhook and the job endpoints the cloud timers call. Without it the
+    # serverless entry points stay closed and the bot runs by polling.
+    hook_secret: SecretStr | None = None
+
+    # A full connection string, such as a hosted Postgres, wins over the parts below.
+    database_dsn: SecretStr | None = Field(default=None, validation_alias="DATABASE_URL")
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -48,7 +58,7 @@ class Settings(BaseSettings):
             return frozenset({value})
         return value
 
-    @field_validator("webapp_url", mode="before")
+    @field_validator("webapp_url", "telegram_api_url", "hook_secret", "database_dsn", mode="before")
     @classmethod
     def _blank_is_none(cls, value: object) -> object:
         return value or None
@@ -56,6 +66,9 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> str:
+        if self.database_dsn is not None:
+            url = make_url(self.database_dsn.get_secret_value())
+            return url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
         return str(
             PostgresDsn.build(
                 scheme="postgresql+asyncpg",
@@ -66,6 +79,12 @@ class Settings(BaseSettings):
                 path=self.postgres_db,
             )
         )
+
+    @property
+    def telegram_reach_url(self) -> str | None:
+        """Where Telegram itself can reach us: the relay when there is one, since Telegram
+        can't connect to Russian clouds either."""
+        return self.telegram_api_url or self.webapp_url
 
     @property
     def tz(self) -> ZoneInfo:

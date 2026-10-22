@@ -44,8 +44,14 @@ async def current_user(
     session: SessionDep,
     settings: Annotated[Settings, Depends(get_settings_from_app)],
 ) -> User:
-    scheme, _, init_data = request.headers.get("Authorization", "").partition(" ")
-    if scheme.lower() != "tma" or not init_data:
+    # Yandex Cloud keeps the Authorization header for its own IAM tokens and drops it, so
+    # the Mini App sends its own header; "Authorization: tma …" still works elsewhere.
+    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    if not init_data:
+        scheme, _, init_data = request.headers.get("Authorization", "").partition(" ")
+        if scheme.lower() != "tma":
+            init_data = ""
+    if not init_data:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Откройте приложение из Telegram")
     try:
         data = parse_init_data(init_data, settings.bot_token.get_secret_value())

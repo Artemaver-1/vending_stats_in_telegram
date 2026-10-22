@@ -12,6 +12,7 @@ from aiogram.types import BufferedInputFile
 from app.db.models import ConnectionEvent, Encashment, PaymentAlert, RentPayment, Task
 from app.formatting import CHANNEL_DEVICES, human_date, month_title, plural, rub, span
 from app.services.downtime import Downtime
+from app.services.file_drop import LINKABLE, FileDrop, zipped
 from app.services.tasks import InspectionOutcome
 
 logger = logging.getLogger(__name__)
@@ -33,25 +34,41 @@ class Notifier(Protocol):
     ) -> None: ...
 
 
+# Larger uploads through the Telegram relay get cut off; see FileDrop.
+DIRECT_UPLOAD_LIMIT = 15_000
+
+
 class TelegramNotifier:
-    def __init__(self, bot: Bot) -> None:
+    def __init__(self, bot: Bot, drop: FileDrop | None = None) -> None:
         self.bot = bot
+        self.drop = drop
 
     async def send(self, chat_ids: Iterable[int], text: str, *, photo: Photo | None = None) -> None:
+        media: str | BufferedInputFile | None = None
+        if photo is not None:
+            media = await self._file(photo.filename, photo.data)
         for chat_id in chat_ids:
             try:
-                if photo is None:
+                if media is None:
                     await self.bot.send_message(chat_id, text)
                 else:
-                    file = BufferedInputFile(photo.data, filename=photo.filename)
-                    await self.bot.send_photo(chat_id, file, caption=text)
+                    await self.bot.send_photo(chat_id, media, caption=text)
             except TelegramAPIError:
                 # One blocked or deleted chat shouldn't stop alerts to everyone else.
                 logger.exception("Failed to notify %s", chat_id)
 
     async def send_document(self, chat_id: int, filename: str, data: bytes, caption: str) -> None:
-        file = BufferedInputFile(data, filename=filename)
-        await self.bot.send_document(chat_id, file, caption=caption)
+        document: str | BufferedInputFile = BufferedInputFile(data, filename=filename)
+        if self.drop is not None and len(data) > DIRECT_UPLOAD_LIMIT:
+            if not filename.endswith(LINKABLE):
+                filename, data = zipped(filename, data)
+            document = await self.drop.put(filename, data)
+        await self.bot.send_document(chat_id, document, caption=caption)
+
+    async def _file(self, filename: str, data: bytes) -> str | BufferedInputFile:
+        if self.drop is None or len(data) <= DIRECT_UPLOAD_LIMIT:
+            return BufferedInputFile(data, filename=filename)
+        return await self.drop.put(filename, data)
 
 
 class Messages:

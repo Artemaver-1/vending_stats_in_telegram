@@ -2,11 +2,9 @@ import asyncio
 import logging
 import signal
 
-from aiogram import Bot
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from app.bot.client import make_bot
 from app.clock import Clock
 from app.config import get_settings
 from app.db import Database
@@ -28,10 +26,7 @@ async def main() -> None:
 
     clock = Clock(settings.tz)
     db = Database(settings.database_url)
-    bot = Bot(
-        settings.bot_token.get_secret_value(),
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+    bot = make_bot(settings)
     client = SmartVendClient(
         settings.smartvend_api_key.get_secret_value(), settings.smartvend_base_url
     )
