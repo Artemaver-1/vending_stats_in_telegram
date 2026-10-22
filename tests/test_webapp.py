@@ -77,10 +77,12 @@ async def test_init_data_header_survives_clouds_that_drop_authorization(
 
 
 async def test_home_routes_by_role(client: httpx.AsyncClient) -> None:
+    # The start screen comes in the first response, without a redirect to follow.
     admin = await client.get("/app/home", headers=as_user(ADMIN_TG))
     worker = await client.get("/app/home", headers=as_user(WORKER_TG))
-    assert '"/app/admin"' in admin.headers["HX-Location"]
-    assert '"/app/service"' in worker.headers["HX-Location"]
+    assert admin.status_code == worker.status_code == 200
+    assert "<h1>Силомеры</h1>" in admin.text
+    assert "Обслуживание силомеров" in worker.text
 
 
 async def test_worker_report_reaches_admin(
@@ -575,3 +577,20 @@ async def test_loading_video_once_a_day(app: FastAPI, client: httpx.AsyncClient)
     # Admins looking at the service screen never get it.
     admin = await client.get("/app/service", headers=as_user(ADMIN_TG))
     assert "splash.mp4" not in admin.text
+
+
+async def test_start_screens_are_cached_until_something_changes(
+    client: httpx.AsyncClient, db: Database
+) -> None:
+    headers = as_user(WORKER_TG)
+    await client.get("/app/service", headers=headers)  # the daily video, never cached
+    first = await client.get("/app/service", headers=headers)
+    async with db.session() as session:
+        session.add(Task(kind=TaskKind.CUSTOM, title="Подшить грушу", due_on=date(2026, 10, 23)))
+    # A change that didn't come through the app waits for the cache to expire...
+    assert (await client.get("/app/service", headers=headers)).text == first.text
+    # ...while any action in the app, a timer or the refresh button clears it.
+    await client.post("/app/admin/sync", headers=as_user(ADMIN_TG))
+    assert "Подшить грушу" in (await client.get("/app/service", headers=headers)).text
+    # Someone else never gets this person's cached screen.
+    assert (await client.get("/app/service", headers=as_user(ADMIN_TG))).text != first.text

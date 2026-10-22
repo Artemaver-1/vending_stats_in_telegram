@@ -65,6 +65,7 @@ async def test_timers_run_jobs_by_secret_path(client: tuple[FastAPI, httpx.Async
     assert (await http.post(f"/jobs/{SECRET}/nothing")).status_code == 404
     done = await http.post(f"/jobs/{SECRET}/reminders")
     assert done.json() == {"job": "reminders", "result": "ok"}
+    assert (await http.post(f"/jobs/{SECRET}/warm")).json()["result"] == "ok"
     # Without SmartVend configured the half-hourly run still checks payments and inspections.
     assert (await http.post(f"/jobs/{SECRET}/telemetry")).json()["result"] == "ok"
 

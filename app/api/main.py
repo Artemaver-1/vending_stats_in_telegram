@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -20,6 +20,7 @@ from app.services.notifications import TelegramNotifier
 from app.webapp.auth import LinkSigner, admin_user
 from app.webapp.routes import machines, service, shell, widget
 from app.webapp.routes.admin import router as admin_router
+from app.webapp.screen_cache import ScreenCache
 from app.worker.jobs import ServiceJobs, TelemetryJobs
 
 STATIC_DIR = Path(__file__).parent.parent / "webapp" / "static"
@@ -93,6 +94,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:
         return RedirectResponse("/app")
+
+    app.state.screen_cache = ScreenCache(settings.bot_token.get_secret_value())
+
+    @app.middleware("http")
+    async def cache_screens(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        cache: ScreenCache = request.app.state.screen_cache
+        if request.method != "GET":
+            response = await call_next(request)
+            # Whatever a POST changed, the cached screens may now be showing the old state.
+            # Timer jobs decide for themselves: the warm-up ping changes nothing.
+            if not request.url.path.startswith("/jobs/"):
+                cache.clear()
+            return response
+        key = cache.key(request, request.app.state.clock.today())
+        if key is None:
+            return await call_next(request)
+        if (hit := cache.get(key)) is not None:
+            return hit
+        response = await call_next(request)
+        if response.status_code != status.HTTP_200_OK or "HX-Trigger" in response.headers:
+            return response
+        body = b"".join([chunk async for chunk in response.body_iterator])  # type: ignore[attr-defined]
+        headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+        # The daily loading video must not come back for three minutes after it played.
+        if b"splash.mp4" not in body:
+            cache.put(key, body, headers)
+        return Response(body, status_code=response.status_code, headers=headers)
 
     @app.middleware("http")
     async def screens_need_the_shell(

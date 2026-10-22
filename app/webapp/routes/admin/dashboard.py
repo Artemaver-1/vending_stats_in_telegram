@@ -55,7 +55,7 @@ async def home(
         )
         machines.append(MachineSummary(machine, pnl.total_revenue, last_check))
 
-    await rent.sync_accruals()
+    # Accruals are brought up to date by the hourly reminder job, not on every visit.
     rent_due = [p for p in await rent.payments() if not p.is_paid and (p.due_on - today).days <= 5]
     overdue = [t for t in await tasks.with_status(TaskStatus.OPEN) if t.due_on and t.due_on < today]
     pending_users = sum(1 for u in await users.list_all() if not u.is_active)

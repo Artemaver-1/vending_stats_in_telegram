@@ -57,6 +57,7 @@ async def run_job(secret: str, name: str, request: Request) -> dict[str, Any] | 
         "reminders": _reminders,
         "backup": _backup,
         "setup": _setup,
+        "warm": _warm,
     }
     if name not in jobs:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
@@ -67,6 +68,8 @@ async def run_job(secret: str, name: str, request: Request) -> dict[str, Any] | 
         logger.exception("Job %s failed", name)
         detail = {"job": name, "error": f"{type(exc).__name__}: {exc}"}
         return JSONResponse(detail, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    if name != "warm":
+        state.screen_cache.clear()
     logger.info("Job %s: %s", name, result)
     return {"job": name, "result": result}
 
@@ -83,6 +86,12 @@ async def _telemetry(request: Request) -> str:
     if getattr(state, "file_drop", None) is not None:
         await state.file_drop.purge()
     return failure or "ok"
+
+
+async def _warm(request: Request) -> str:
+    """Called every few minutes so the cloud keeps an instance, with its database
+    connection, ready for the next person who opens the app."""
+    return "ok" if await request.app.state.db.ping() else "no database"
 
 
 async def _reminders(request: Request) -> str:

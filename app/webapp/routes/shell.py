@@ -1,12 +1,15 @@
-import json
-
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, Response
 
 from app import __version__
-from app.api.deps import SessionDep
+from app.api.deps import ClockDep, SessionDep
 from app.db.models import Attachment
+from app.services.rent import RentService
+from app.services.staff import UserService
+from app.services.tasks import TaskService
 from app.webapp.auth import CurrentUser, LinkSigner
+from app.webapp.routes import service
+from app.webapp.routes.admin import dashboard
 from app.webapp.templating import templates
 
 router = APIRouter(prefix="/app")
@@ -19,11 +22,18 @@ async def shell(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "shell.html", {"version": __version__})
 
 
-@router.get("/home")
-async def home(user: CurrentUser) -> Response:
-    """Sends each person to their own start screen; htmx follows HX-Location in place."""
-    path = "/app/admin" if user.is_admin else "/app/service"
-    return Response(headers={"HX-Location": json.dumps({"path": path, "target": "#view"})})
+@router.get("/home", response_class=HTMLResponse)
+async def home(
+    request: Request, user: CurrentUser, session: SessionDep, clock: ClockDep
+) -> HTMLResponse:
+    """Each person's start screen, rendered right away: a redirect to it would cost one
+    more round trip on every launch."""
+    tasks = TaskService(session, clock)
+    if user.is_admin:
+        return await dashboard.home(
+            request, user, session, clock, tasks, RentService(session, clock), UserService(session)
+        )
+    return await service.home(request, user, tasks, session, clock)
 
 
 @router.get("/attachments/{attachment_id}")
