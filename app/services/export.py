@@ -90,7 +90,7 @@ class DataExporter:
         return out.getvalue()
 
     async def _monthly_summary(self) -> str:
-        finance = FinanceService(self.session)
+        finance = await FinanceService.snapshot(self.session)
         today = self.clock.today()
         machines = list(await self.session.scalars(select(Machine).order_by(Machine.name)))
         scopes: list[tuple[str, int | None]] = [("Все силомеры", None)]

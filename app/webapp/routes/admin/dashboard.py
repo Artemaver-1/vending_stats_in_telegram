@@ -44,7 +44,7 @@ async def home(
     toast: str | None = None,
 ) -> HTMLResponse:
     today = clock.today()
-    finance = FinanceService(session)
+    finance = await FinanceService.snapshot(session)
 
     machines = []
     for machine in await MachineRepository(session).list_active():

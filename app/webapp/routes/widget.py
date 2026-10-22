@@ -1,6 +1,8 @@
+import contextlib
 from pathlib import Path
 from typing import Any
 
+from aiogram.exceptions import TelegramAPIError
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
@@ -13,6 +15,15 @@ from app.webapp.templating import render, with_toast
 router = APIRouter()
 
 SCRIPT_TEMPLATE = Path(__file__).parent.parent / "widget" / "silomery.js"
+
+
+async def bot_username(request: Request) -> str:
+    """Asked from Telegram on first need rather than on every cold start of the app."""
+    state = request.app.state
+    if state.bot_username is None:
+        with contextlib.suppress(TelegramAPIError, OSError, AttributeError):
+            state.bot_username = (await state.bot.get_me()).username
+    return state.bot_username or ""
 
 
 @router.get("/widget/{token}")
@@ -40,7 +51,7 @@ async def send_widget_script(
     script = (
         SCRIPT_TEMPLATE.read_text()
         .replace("{{TOKEN}}", token)
-        .replace("{{BOT}}", request.app.state.bot_username or "")
+        .replace("{{BOT}}", await bot_username(request))
         .replace("{{URL}}", base)
     )
     await notifier.send_document(

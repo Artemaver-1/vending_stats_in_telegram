@@ -29,9 +29,12 @@ class MachineRevenue:
     this_month: Decimal
 
 
-async def machine_revenue(session: SessionDep, machine: Machine, today: date) -> MachineRevenue:
-    """Takings only: the service team sees how a machine earns, not the business's profit."""
-    finance = FinanceService(session)
+async def machine_revenue(
+    session: SessionDep, machine: Machine, today: date, finance: FinanceService | None = None
+) -> MachineRevenue:
+    """Takings only: the service team sees how a machine earns, not the business's profit.
+    A screen listing several machines passes one snapshot for all of them."""
+    finance = finance or await FinanceService.snapshot(session)
     recent = await finance.statement(today - timedelta(days=RECENT_DAYS - 1), today, machine.id)
     month = await finance.statement(month_start(today), today, machine.id)
     return MachineRevenue(recent.total_revenue, month.total_revenue)

@@ -52,7 +52,7 @@ async def income_statement(
     toast: str | None = None,
 ) -> HTMLResponse:
     today = clock.today()
-    finance = FinanceService(session)
+    finance = await FinanceService.snapshot(session)
 
     if all_time:
         start, end = await finance.first_day(machine) or today, today

@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, DateTime, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -131,30 +131,48 @@ class TreasuryService:
         first = last
         for _month in range(count - 1):
             first = previous_month(first)
-        flows = []
-        for month in iter_months(first, last):
-            end = next_month(month)
-            flows.append(
-                MonthFlow(
-                    month=month,
-                    card_in=await self._card_in(month, end),
-                    deposited=await self._sum(
-                        Encashment.deposited,
-                        Encashment.deposited_on >= month,
-                        Encashment.deposited_on < end,
-                    ),
-                    spent_from_bank=await self._sum(
-                        Expense.amount,
-                        Expense.paid_from == PaidFrom.BANK,
-                        Expense.spent_on >= month,
-                        Expense.spent_on < end,
-                    ),
-                    paid_out=await self._sum(
-                        Payout.amount, Payout.paid_on >= month, Payout.paid_on < end
-                    ),
-                )
+        until = next_month(last)
+        # One grouped query per kind of flow; per-month queries meant 48 round trips.
+        card_in = await self._by_month(
+            DailyRevenue.amount,
+            DailyRevenue.day,
+            first,
+            until,
+            DailyRevenue.channel == PaymentChannel.CARD,
+        )
+        deposited = await self._by_month(
+            Encashment.deposited, Encashment.deposited_on, first, until
+        )
+        spent = await self._by_month(
+            Expense.amount, Expense.spent_on, first, until, Expense.paid_from == PaidFrom.BANK
+        )
+        paid_out = await self._by_month(Payout.amount, Payout.paid_on, first, until)
+        return [
+            MonthFlow(
+                month=month,
+                card_in=card_in.get(month, ZERO),
+                deposited=deposited.get(month, ZERO),
+                spent_from_bank=spent.get(month, ZERO),
+                paid_out=paid_out.get(month, ZERO),
             )
-        return flows
+            for month in iter_months(first, last)
+        ]
+
+    async def _by_month(
+        self,
+        column: InstrumentedAttribute[Any],
+        day: InstrumentedAttribute[Any],
+        first: date,
+        until: date,
+        *conditions: ColumnElement[bool],
+    ) -> dict[date, Decimal]:
+        month = func.date_trunc("month", cast(day, DateTime()))
+        rows = await self.session.execute(
+            select(month, func.sum(column))
+            .where(day >= first, day < until, *conditions)
+            .group_by(month)
+        )
+        return {start.date(): Decimal(total or 0) for start, total in rows}
 
     async def payouts(self) -> Sequence[Payout]:
         result = await self.session.scalars(

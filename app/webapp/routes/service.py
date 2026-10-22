@@ -15,6 +15,7 @@ from app.domain.inspection import CHECKLIST
 from app.repositories import MachineRepository
 from app.services.cash import CashError, EncashmentService
 from app.services.downtime import DowntimeService
+from app.services.finance import FinanceService
 from app.services.notifications import Messages
 from app.services.payment_watch import PaymentWatch
 from app.services.tasks import TaskError
@@ -56,12 +57,13 @@ async def home(
     next_due = {t.machine_id: t.due_on for t in open_tasks if t.kind is TaskKind.INSPECTION}
 
     cards = []
+    finance = await FinanceService.snapshot(session)
     for machine in await MachineRepository(session).list_active():
         last = await tasks.last_inspection(machine.id)
         last_day = None
         if last is not None and last.completed_at is not None:
             last_day = last.completed_at.astimezone(clock.tz).date()
-        revenue = await machine_revenue(session, machine, clock.today())
+        revenue = await machine_revenue(session, machine, clock.today(), finance)
         cards.append(MachineCard(machine, last_day, next_due.get(machine.id), revenue))
 
     # Weekly checks live on the machine cards; the list holds one-off and cash tasks.

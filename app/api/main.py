@@ -1,9 +1,7 @@
-import contextlib
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from aiogram.exceptions import TelegramAPIError
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -47,8 +45,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.dispatcher = build_dispatcher(
                 bot, app.state.db, webapp, media_url=settings.telegram_reach_url
             )
-        with contextlib.suppress(TelegramAPIError, OSError):
-            app.state.bot_username = (await bot.get_me()).username
         smartvend = None
         if settings.smartvend_api_key is not None:
             # The refresh button waits for this client, and the tunnel drops requests after

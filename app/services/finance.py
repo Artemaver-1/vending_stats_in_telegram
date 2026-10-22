@@ -22,6 +22,7 @@ from app.repositories import (
     RentContractRepository,
     RevenueRepository,
 )
+from app.repositories.snapshot import FinanceSnapshot
 
 
 class MachineNotFoundError(LookupError):
@@ -45,6 +46,20 @@ class FinanceService:
         self.expenses = ExpenseRepository(session)
         self.contracts = RentContractRepository(session)
         self.machines = MachineRepository(session)
+
+    @classmethod
+    async def snapshot(cls, session: AsyncSession) -> "FinanceService":
+        """Reads everything a statement needs in four queries and answers from memory.
+
+        For screens that only read: a dashboard asks for dozens of monthly statements,
+        and against a remote database each separate query is a round trip. Nothing
+        written after this call is seen.
+        """
+        service = cls(session)
+        books = await FinanceSnapshot.load(session)
+        service.revenue, service.expenses = books.revenue, books.expenses
+        service.contracts, service.machines = books.contracts, books.machines
+        return service
 
     async def statement(
         self, start: date, end: date, machine_id: int | None = None

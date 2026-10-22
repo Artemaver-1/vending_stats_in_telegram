@@ -63,7 +63,7 @@ async def monthly(
     if first > last:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "first must not be after last")
     try:
-        months = await FinanceService(session).pnl_range(first, last, machine_id)
+        months = await (await FinanceService.snapshot(session)).pnl_range(first, last, machine_id)
     except MachineNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "machine not found") from exc
     return [PnlOut.from_domain(m) for m in months]
@@ -73,7 +73,7 @@ async def monthly(
 async def payback(
     session: SessionDep, clock: ClockDep, machine_id: int | None = None
 ) -> PaybackOut:
-    service = FinanceService(session)
+    service = await FinanceService.snapshot(session)
     try:
         if machine_id is None:
             result = await service.business_payback(clock.today())
