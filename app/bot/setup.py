@@ -15,8 +15,12 @@ from app.services.staff import UserService
 logger = logging.getLogger(__name__)
 
 
-def build_dispatcher(bot: Bot, db: Database, webapp: WebAppLink) -> Dispatcher:
-    dp = Dispatcher(webapp=webapp)
+def build_dispatcher(
+    bot: Bot, db: Database, webapp: WebAppLink, *, media_url: str | None = None
+) -> Dispatcher:
+    """`media_url` is where Telegram itself can download our pictures, when that differs
+    from the Mini App's address (a relay in front of a cloud Telegram can't reach)."""
+    dp = Dispatcher(webapp=webapp, media_url=media_url)
     dp.update.outer_middleware(DatabaseMiddleware(db))
     dp.update.outer_middleware(AccessMiddleware(TelegramNotifier(bot)))
     dp.include_router(build_router())

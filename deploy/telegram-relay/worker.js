@@ -1,7 +1,8 @@
 // Telegram and Russian clouds can't reach each other directly, Cloudflare reaches both.
 // Outgoing: the bot's calls go on to api.telegram.org, only this bot's, so the relay
 // can't be borrowed by strangers. Incoming: Telegram's webhook and the files Telegram
-// fetches by link are passed back to the app at ORIGIN.
+// fetches by link (including the bot's static pictures) are passed back to the app at
+// ORIGIN.
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -11,7 +12,7 @@ export default {
     }
     const incoming =
       (request.method === "POST" && url.pathname === "/telegram/webhook") ||
-      (request.method === "GET" && url.pathname.startsWith("/files/"));
+      (request.method === "GET" && /^\/(files|static)\//.test(url.pathname));
     if (incoming && env.ORIGIN) {
       return fetch(new Request(env.ORIGIN + url.pathname + url.search, request));
     }

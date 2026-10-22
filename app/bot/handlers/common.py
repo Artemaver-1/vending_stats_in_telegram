@@ -27,11 +27,12 @@ class WelcomePicture:
         self.path = path
         self.file_id: str | None = None
 
-    def input(self, link: WebAppLink) -> str | FSInputFile:
+    def input(self, link: WebAppLink, media_url: str | None = None) -> str | FSInputFile:
         if self.file_id:
             return self.file_id
-        if link.url:
-            return link.url.removesuffix("/app") + "/static/" + self.path.name
+        base = media_url or (link.url.removesuffix("/app") if link.url else None)
+        if base:
+            return base.rstrip("/") + "/static/" + self.path.name
         return FSInputFile(self.path)
 
     def remember(self, message: Message) -> None:
@@ -51,7 +52,9 @@ def open_app_keyboard(link: WebAppLink, user: User) -> InlineKeyboardMarkup | No
 
 
 @router.message(CommandStart())
-async def start(message: Message, user: User, webapp: WebAppLink) -> None:
+async def start(
+    message: Message, user: User, webapp: WebAppLink, media_url: str | None = None
+) -> None:
     if message.bot is not None:
         await webapp.apply(message.bot, [user])
     keyboard = open_app_keyboard(webapp, user)
@@ -61,7 +64,9 @@ async def start(message: Message, user: User, webapp: WebAppLink) -> None:
 
     if user.is_admin:
         sent = await message.answer_photo(
-            welcome_picture.input(webapp), caption=ADMIN_WELCOME, reply_markup=keyboard
+            welcome_picture.input(webapp, media_url),
+            caption=ADMIN_WELCOME,
+            reply_markup=keyboard,
         )
         welcome_picture.remember(sent)
     else:

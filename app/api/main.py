@@ -44,7 +44,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.service_jobs = ServiceJobs(app.state.db, app.state.notifier, app.state.clock)
         if settings.hook_secret is not None:
             webapp = WebAppLink(settings.webapp_url, settings.tunnel_metrics_url)
-            app.state.dispatcher = build_dispatcher(bot, app.state.db, webapp)
+            app.state.dispatcher = build_dispatcher(
+                bot, app.state.db, webapp, media_url=settings.telegram_reach_url
+            )
         with contextlib.suppress(TelegramAPIError, OSError):
             app.state.bot_username = (await bot.get_me()).username
         smartvend = None
